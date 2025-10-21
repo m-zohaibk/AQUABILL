@@ -30,7 +30,7 @@ import {
 // --- Simple UI primitives (Tailwind-only) to avoid external UI deps ---
 const Btn = ({ children, className = '', ...props }) => (
   <button
-    className={`px-3 py-2 rounded-xl shadow-sm border text-sm hover:shadow transition ${className}`}
+    className={`px-3 py-2 rounded-xl shadow-sm border text-sm hover:shadow transition disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
     {...props}
   >
     {children}
@@ -104,6 +104,7 @@ function App() {
   const [search, setSearch] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
   const [view, setView] = useState('invoices'); // invoices | settings | about
+  const [customerToDelete, setCustomerToDelete] = useState(null);
 
   // --- Firestore Data ---
   const customersRef = useMemoFirebase(
@@ -159,12 +160,12 @@ function App() {
 
   const deleteCustomer = (id) => {
     if (!firestore) return;
-    if (!confirm('Delete this customer and all their invoices?')) return;
     const customerDoc = doc(firestore, 'customers', id);
     deleteDocumentNonBlocking(customerDoc);
     // Note: Deleting subcollections needs a more complex implementation (e.g., a cloud function)
     // For now, invoices will be orphaned but won't appear in the UI.
     if (selectedCustomerId === id) setSelectedCustomerId(null);
+    setCustomerToDelete(null);
   };
 
   // Actions: Invoices
@@ -374,7 +375,7 @@ function App() {
                     </Btn>
                     <Btn
                       className="text-xs border-red-200 text-red-600"
-                      onClick={() => deleteCustomer(c.id)}
+                      onClick={() => setCustomerToDelete(c)}
                     >
                       Del
                     </Btn>
@@ -433,6 +434,14 @@ function App() {
         © {new Date().getFullYear()} Tubewell Water Supply — Simple Invoice
         Management.
       </footer>
+      
+      {customerToDelete && (
+        <CustomerDeleteDialog
+          customer={customerToDelete}
+          onClose={() => setCustomerToDelete(null)}
+          onConfirm={() => deleteCustomer(customerToDelete.id)}
+        />
+      )}
     </div>
   );
 }
@@ -1113,5 +1122,42 @@ function HelpView() {
         </li>
       </ol>
     </Card>
+  );
+}
+
+// --- Customer Delete Dialog ---
+function CustomerDeleteDialog({ customer, onClose, onConfirm }) {
+  const [confirmationText, setConfirmationText] = useState('');
+  const isMatch = confirmationText === customer.name;
+
+  return (
+    <AlertDialog open={true} onOpenChange={onClose}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete Customer: {customer.name}?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This action cannot be undone. This will permanently delete the customer and all their associated invoices.
+            <br/><br/>
+            To confirm, please type the customer's name: <strong>{customer.name}</strong>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <Input
+          value={confirmationText}
+          onChange={(e) => setConfirmationText(e.target.value)}
+          placeholder="Type the customer name to confirm"
+          className="mt-2"
+        />
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={onClose}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={onConfirm}
+            disabled={!isMatch}
+            className="bg-red-600 hover:bg-red-700"
+          >
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
