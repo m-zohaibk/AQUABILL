@@ -744,6 +744,8 @@ function InvoiceForm({ settings, customerId, onSubmit }) {
 }
 
 function InvoiceRow({ inv, settings, onUpdate, onDelete }) {
+  const [isEditing, setIsEditing] = useState(false);
+
   const mins = inv.durationMinutes;
   const total = inv.totalCost;
   const rounded = roundAbout(total);
@@ -803,41 +805,9 @@ function InvoiceRow({ inv, settings, onUpdate, onDelete }) {
     win.document.close();
   };
   
-  const handleEdit = () => {
-      const date = prompt('Date (YYYY-MM-DD)', inv.date) || inv.date;
-      const startTime = prompt('Start Time (HH:MM)', inv.startTime) || inv.startTime;
-      const endTime = prompt('End Time (HH:MM)', inv.endTime) || inv.endTime;
-      
-      const newMins = minutesBetween(startTime, endTime);
-      
-      const ratePerMinute = Number(
-        prompt(
-          'Rate per minute',
-          (inv.ratePerMinute ?? settings.ratePerMinute).toString()
-        )
-      );
-      if(isNaN(ratePerMinute)) return alert("Invalid rate per minute");
-
-      const newTotal = newMins * ratePerMinute;
-      
-      const amountReceived = Number(
-        prompt('Amount received', (inv.amountReceived ?? 0).toString())
-      );
-       if(isNaN(amountReceived)) return alert("Invalid amount received");
-      
-      const newPending = newTotal - amountReceived;
-
-      onUpdate(inv.id, {
-        date,
-        startTime,
-        endTime,
-        ratePerMinute,
-        amountReceived,
-        durationMinutes: newMins,
-        totalCost: newTotal,
-        amountPending: newPending,
-      });
-  };
+  if (isEditing) {
+    return <EditInvoiceForm inv={inv} settings={settings} onSave={(updates) => { onUpdate(inv.id, updates); setIsEditing(false); }} onCancel={() => setIsEditing(false)} />;
+  }
 
   return (
     <tr className="border-b">
@@ -866,7 +836,7 @@ function InvoiceRow({ inv, settings, onUpdate, onDelete }) {
           </Btn>
           <Btn
             className="text-xs"
-            onClick={handleEdit}
+            onClick={() => setIsEditing(true)}
           >
             Edit
           </Btn>
@@ -876,6 +846,99 @@ function InvoiceRow({ inv, settings, onUpdate, onDelete }) {
           >
             Delete
           </Btn>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+function EditInvoiceForm({ inv, settings, onSave, onCancel }) {
+  const [formData, setFormData] = useState({
+    date: inv.date,
+    startTime: inv.startTime,
+    endTime: inv.endTime,
+    ratePerMinute: inv.ratePerMinute ?? settings.ratePerMinute,
+    amountReceived: inv.amountReceived ?? 0,
+  });
+
+  const handleChange = (e) => {
+    const { name, value, type } = e.target;
+    setFormData(prev => ({ ...prev, [name]: type === 'number' ? Number(value) : value }));
+  };
+
+  const handleSave = () => {
+    const { date, startTime, endTime, ratePerMinute, amountReceived } = formData;
+    const newMins = minutesBetween(startTime, endTime);
+    if (isNaN(newMins)) {
+        alert("Invalid time format.");
+        return;
+    }
+
+    if (isNaN(ratePerMinute)) {
+        alert("Invalid rate per minute.");
+        return;
+    }
+
+    if (isNaN(amountReceived)) {
+        alert("Invalid amount received.");
+        return;
+    }
+    
+    const newTotal = newMins * ratePerMinute;
+    const newPending = newTotal - amountReceived;
+    onSave({
+      date,
+      startTime,
+      endTime,
+      ratePerMinute,
+      amountReceived,
+      durationMinutes: newMins,
+      totalCost: newTotal,
+      amountPending: newPending,
+    });
+  };
+  
+  const calculated = useMemo(() => {
+    const mins = minutesBetween(formData.startTime, formData.endTime);
+    const total = mins * formData.ratePerMinute;
+    return { mins, total, pending: total - formData.amountReceived };
+  }, [formData]);
+
+
+  return (
+    <tr className="bg-indigo-50">
+      <td colSpan={9} className="p-4">
+        <div className="grid grid-cols-6 gap-4">
+          <div className="col-span-2">
+            <Label>Date</Label>
+            <Input type="date" name="date" value={formData.date} onChange={handleChange} />
+          </div>
+          <div>
+            <Label>Start Time</Label>
+            <Input type="time" name="startTime" value={formData.startTime} onChange={handleChange} />
+          </div>
+          <div>
+            <Label>End Time</Label>
+            <Input type="time" name="endTime" value={formData.endTime} onChange={handleChange} />
+          </div>
+           <div className="col-span-2">
+            <Label>Info</Label>
+             <div className="text-xs text-gray-600 mt-2">
+                Duration: {calculated.mins} min, Total: {formatPKR(calculated.total)}
+             </div>
+          </div>
+          <div className="col-span-2">
+            <Label>Rate per Minute (PKR)</Label>
+            <Input type="number" step="0.001" name="ratePerMinute" value={formData.ratePerMinute} onChange={handleChange} />
+          </div>
+           <div className="col-span-2">
+            <Label>Amount Received (PKR)</Label>
+            <Input type="number" step="0.01" name="amountReceived" value={formData.amountReceived} onChange={handleChange} />
+          </div>
+          <div className="col-span-2 flex items-end gap-2">
+            <Btn className="w-full bg-indigo-600 text-white" onClick={handleSave}>Save</Btn>
+            <Btn className="w-full bg-gray-200" onClick={onCancel}>Cancel</Btn>
+          </div>
         </div>
       </td>
     </tr>
