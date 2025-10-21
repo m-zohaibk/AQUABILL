@@ -1,31 +1,29 @@
 /**
- * @fileoverview Firestore Security Rules for AquaBill Application
+ * @file Firestore Security Rules
+ * @description This ruleset allows unrestricted access to all data.
  *
  * Core Philosophy:
- * This ruleset allows all users to read and write all data in the database without any restrictions.
- * This approach is suitable for prototyping or development environments where security is not a primary concern.
+ * The application requires no authorization restrictions, so all read and write operations are allowed for all users.
  *
  * Data Structure:
- * - /customers/{customerId}: Stores customer information.
- * - /customers/{customerId}/invoices/{invoiceId}: Stores invoices for each customer.
- * - /settings/{settingId}: Stores application-wide settings. Only a single settings document is expected.
+ * - /customers/{customerId}: Stores customer data.
+ * - /customers/{customerId}/invoices/{invoiceId}: Stores invoices associated with a specific customer.
+ * - /settings/{settingId}: Stores application settings.
  *
  * Key Security Decisions:
- * - All read and write operations are permitted for all users, including unauthenticated users.
- * - No data validation is performed.
- *
- * WARNING: This configuration should NEVER be used in a production environment. It exposes all data to unauthorized access and modification.
+ * - No access restrictions are enforced. All users can read and write all data.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows all users to read and write customer data.
+     * @description Allows unrestricted access to customer data.
      * @path /customers/{customerId}
-     * @allow (create, update, delete, get, list) - Any user can create, update, delete, get, or list customer documents.
-     * @deny None. All operations are allowed.
-     * @principle No security restrictions applied.
+     * @allow (get, list) Any user can read customer data.
+     * @allow (create, update, delete) Any user can modify customer data.
+     * @deny None. All requests are allowed.
+     * @principle No authorization is required.
      */
     match /customers/{customerId} {
       allow get, list: if true;
@@ -33,11 +31,12 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows all users to read and write invoice data for any customer.
+     * @description Allows unrestricted access to invoices associated with a customer.
      * @path /customers/{customerId}/invoices/{invoiceId}
-     * @allow (create, update, delete, get, list) - Any user can create, update, delete, get, or list invoice documents.
-     * @deny None. All operations are allowed.
-     * @principle No security restrictions applied.
+     * @allow (get, list) Any user can read invoice data.
+     * @allow (create, update, delete) Any user can modify invoice data.
+     * @deny None. All requests are allowed.
+     * @principle No authorization is required.
      */
     match /customers/{customerId}/invoices/{invoiceId} {
       allow get, list: if true;
@@ -45,11 +44,12 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows all users to read and write application settings.
+     * @description Allows unrestricted access to application settings.
      * @path /settings/{settingId}
-     * @allow (create, update, delete, get, list) - Any user can create, update, delete, get, or list setting documents.
-     * @deny None. All operations are allowed.
-     * @principle No security restrictions applied.
+     * @allow (get, list) Any user can read application settings.
+     * @allow (create, update, delete) Any user can modify application settings.
+     * @deny None. All requests are allowed.
+     * @principle No authorization is required.
      */
     match /settings/{settingId} {
       allow get, list: if true;
