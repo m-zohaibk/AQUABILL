@@ -476,6 +476,12 @@ function DashboardView({ customers, firestore, settings }) {
   useEffect(() => {
     async function fetchAllInvoices() {
       if (!firestore || !customers || customers.length === 0) {
+        setStats({
+          totalReceived: 0,
+          totalPending: 0,
+          totalCustomers: customers?.length || 0,
+          totalInvoices: 0,
+        });
         setIsLoading(false);
         return;
       }
@@ -885,7 +891,7 @@ function EditInvoiceForm({ inv, settings, onSave, onCancel }) {
         return;
     }
 
-    if (isNaN(ratePerMinute)) {
+    if (isNaN(ratePerMinute) || ratePerMinute <= 0) {
         alert("Invalid rate per minute.");
         return;
     }
