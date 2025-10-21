@@ -238,11 +238,10 @@ function App() {
           i.date,
           `${i.startTime} - ${i.endTime}`,
           `${mins} min`,
-          (i.ratePerMinute ?? settings.ratePerMinute).toFixed(3),
-          total.toFixed(2),
-          `~${rounded}`,
-          (i.amountReceived ?? 0).toFixed(2),
-          i.amountPending.toFixed(2),
+          roundAbout(i.ratePerMinute ?? settings.ratePerMinute),
+          roundAbout(total),
+          roundAbout(i.amountReceived ?? 0),
+          roundAbout(i.amountPending),
         ];
       });
 
@@ -255,7 +254,6 @@ function App() {
           'Duration',
           'Rate/min',
           'Total',
-          '≈ Rounded',
           'Received',
           'Pending',
         ],
@@ -867,7 +865,7 @@ function EditInvoiceForm({ inv, settings, onSave, onCancel }) {
     date: inv.date,
     startTime: inv.startTime,
     endTime: inv.endTime,
-    ratePerMinute: inv.ratePerMinute ?? settings.ratePerMinute,
+    ratePerMinute: inv.ratePerMinute,
     amountReceived: inv.amountReceived ?? 0,
   });
 
@@ -935,7 +933,7 @@ function EditInvoiceForm({ inv, settings, onSave, onCancel }) {
           </div>
           <div className="sm:col-span-1">
             <Label>Rate per Minute (PKR)</Label>
-            <Input type="number" step="0.001" name="ratePerMinute" value={formData.ratePerMinute} readOnly className="bg-gray-100" />
+            <Input type="number" step="any" name="ratePerMinute" value={formData.ratePerMinute} readOnly className="bg-gray-100" />
           </div>
            <div className="sm:col-span-2">
             <Label>Amount Received (PKR)</Label>
