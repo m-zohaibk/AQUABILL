@@ -527,7 +527,10 @@ function DashboardView({ customers, firestore, settings }) {
         </Card>
         <Card className="p-4">
           <h3 className="text-sm font-medium text-gray-500">Total Amount Pending</h3>
-          <p className="mt-1 text-3xl font-semibold text-red-600">{formatPKR(stats.totalPending)}</p>
+          <p className="mt-1 text-3xl font-semibold text-red-600">
+            {formatPKR(stats.totalPending)}
+            <span className="text-lg text-gray-400 ml-2">(≈ {roundAbout(stats.totalPending)})</span>
+          </p>
         </Card>
         <Card className="p-4">
           <h3 className="text-sm font-medium text-gray-500">Total Customers</h3>
