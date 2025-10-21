@@ -650,7 +650,7 @@ function InvoicesView({
               ))}
               {(!customerInvoices || customerInvoices.length === 0) && (
                 <tr>
-                  <td colSpan={9} className="p-4 text-center text-gray-500">
+                  <td colSpan={8} className="p-4 text-center text-gray-500">
                     No invoices yet.
                   </td>
                 </tr>
@@ -800,19 +800,13 @@ function InvoiceRow({ inv, settings, onUpdate, onDelete }) {
               <tbody>
                 <tr>
                   <td>Water Supply (${inv.durationMinutes} minutes)</td>
-                  <td>PKR ${(
-                    inv.ratePerMinute ?? settings.ratePerMinute
-                  ).toFixed(3)}</td>
-                  <td>PKR ${inv.totalCost.toFixed(2)}</td>
+                  <td>PKR ${roundAbout(inv.ratePerMinute ?? settings.ratePerMinute)}</td>
+                  <td>PKR ${roundAbout(inv.totalCost)}</td>
                 </tr>
               </tbody>
             </table>
-            <div class="row" style="margin-top:12px;"><strong>Amount Received:</strong> <span>PKR ${(
-              inv.amountReceived ?? 0
-            ).toFixed(2)}</span></div>
-            <div class="row"><strong>Amount Pending:</strong> <span>PKR ${inv.amountPending.toFixed(
-              2
-            )}</span></div>
+            <div class="row" style="margin-top:12px;"><strong>Amount Received:</strong> <span>PKR ${roundAbout(inv.amountReceived ?? 0)}</span></div>
+            <div class="row"><strong>Amount Pending:</strong> <span>PKR ${roundAbout(inv.amountPending)}</span></div>
           </div>
           <script>window.onload = () => window.print();</script>
         </body>
@@ -834,7 +828,7 @@ function InvoiceRow({ inv, settings, onUpdate, onDelete }) {
       </td>
       <td className="p-2">{inv.durationMinutes} min</td>
       <td className="p-2">
-        {(inv.ratePerMinute ?? settings.ratePerMinute).toFixed(3)}
+        {roundAbout(inv.ratePerMinute ?? settings.ratePerMinute)}
       </td>
       <td className="p-2">{roundAbout(inv.totalCost)}</td>
       <td className="p-2">{roundAbout(inv.amountReceived ?? 0)}</td>
@@ -883,8 +877,7 @@ function EditInvoiceForm({ inv, settings, onSave, onCancel }) {
   };
 
   const handleSave = () => {
-    const { date, startTime, endTime, amountReceived } = formData;
-    const ratePerMinute = inv.ratePerMinute ?? settings.ratePerMinute;
+    const { date, startTime, endTime, amountReceived, ratePerMinute } = formData;
     const newMins = minutesBetween(startTime, endTime);
     if (isNaN(newMins)) {
         alert("Invalid time format.");
@@ -920,9 +913,9 @@ function EditInvoiceForm({ inv, settings, onSave, onCancel }) {
 
   return (
     <tr className="bg-indigo-50">
-      <td colSpan={9} className="p-4">
-        <div className="grid grid-cols-6 gap-4">
-          <div className="col-span-2">
+      <td colSpan={8} className="p-4">
+        <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
+          <div className="sm:col-span-2">
             <Label>Date</Label>
             <Input type="date" name="date" value={formData.date} onChange={handleChange} />
           </div>
@@ -934,21 +927,21 @@ function EditInvoiceForm({ inv, settings, onSave, onCancel }) {
             <Label>End Time</Label>
             <Input type="time" name="endTime" value={formData.endTime} onChange={handleChange} />
           </div>
-           <div className="col-span-2">
+           <div className="sm:col-span-2">
             <Label>Info</Label>
              <div className="text-xs text-gray-600 mt-2">
                 Duration: {calculated.mins} min, Total: {formatPKR(calculated.total)}
              </div>
           </div>
-          <div className="col-span-2">
+          <div className="sm:col-span-1">
             <Label>Rate per Minute (PKR)</Label>
-            <Input type="number" step="0.001" name="ratePerMinute" value={formData.ratePerMinute.toFixed(3)} readOnly className="bg-gray-100" />
+            <Input type="number" step="0.001" name="ratePerMinute" value={formData.ratePerMinute} readOnly className="bg-gray-100" />
           </div>
-           <div className="col-span-2">
+           <div className="sm:col-span-2">
             <Label>Amount Received (PKR)</Label>
             <Input type="number" step="1" name="amountReceived" value={formData.amountReceived} onChange={handleChange} />
           </div>
-          <div className="col-span-2 flex items-end gap-2">
+          <div className="sm:col-span-2 flex items-end gap-2">
             <Btn className="w-full bg-indigo-600 text-white" onClick={handleSave}>Save</Btn>
             <Btn className="w-full bg-gray-200" onClick={onCancel}>Cancel</Btn>
           </div>
