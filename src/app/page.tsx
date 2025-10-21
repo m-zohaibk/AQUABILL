@@ -813,19 +813,17 @@ function InvoiceRow({ inv, settings, onUpdate, onDelete }) {
       const ratePerMinute = Number(
         prompt(
           'Rate per minute',
-          inv.ratePerMinute ?? settings.ratePerMinute
-        ) ??
-          inv.ratePerMinute ??
-          settings.ratePerMinute
+          (inv.ratePerMinute ?? settings.ratePerMinute).toString()
+        )
       );
+      if(isNaN(ratePerMinute)) return alert("Invalid rate per minute");
 
       const newTotal = newMins * ratePerMinute;
       
       const amountReceived = Number(
-        prompt('Amount received', inv.amountReceived ?? 0) ??
-          inv.amountReceived ??
-          0
+        prompt('Amount received', (inv.amountReceived ?? 0).toString())
       );
+       if(isNaN(amountReceived)) return alert("Invalid amount received");
       
       const newPending = newTotal - amountReceived;
 
