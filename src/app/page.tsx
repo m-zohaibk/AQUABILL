@@ -63,12 +63,13 @@ const minutesBetween = (start, end) => {
   return Math.max(0, diff);
 };
 
+const roundAbout = (num) => Math.round(num);
+
 const formatPKR = (num) => {
   if (isNaN(num)) return 'PKR 0';
-  return `PKR ${num.toFixed(2)}`;
+  return `PKR ${roundAbout(num)}`;
 };
 
-const roundAbout = (num) => Math.round(num);
 
 const defaultSettings = {
   ratePerMinute: 16.666,
@@ -529,7 +530,6 @@ function DashboardView({ customers, firestore, settings }) {
           <h3 className="text-sm font-medium text-gray-500">Total Amount Pending</h3>
           <p className="mt-1 text-3xl font-semibold text-red-600">
             {formatPKR(stats.totalPending)}
-            <span className="text-lg text-gray-400 ml-2">(≈ {roundAbout(stats.totalPending)})</span>
           </p>
         </Card>
         <Card className="p-4">
@@ -564,6 +564,19 @@ function InvoicesView({
   onDeleteInvoice,
   onExportPDF,
 }) {
+
+  const totals = useMemo(() => {
+    if (!customerInvoices) return { received: 0, pending: 0 };
+    return customerInvoices.reduce(
+      (acc, inv) => {
+        acc.received += inv.amountReceived || 0;
+        acc.pending += inv.amountPending || 0;
+        return acc;
+      },
+      { received: 0, pending: 0 }
+    );
+  }, [customerInvoices]);
+
   if (!selectedCustomer)
     return (
       <Card className="p-6 grid place-content-center min-h-[60vh] text-center">
@@ -620,7 +633,6 @@ function InvoicesView({
                 <th className="text-left p-2">Duration</th>
                 <th className="text-left p-2">Rate/min</th>
                 <th className="text-left p-2">Total</th>
-                <th className="text-left p-2">≈ Rounded</th>
                 <th className="text-left p-2">Received</th>
                 <th className="text-left p-2">Pending</th>
                 <th className="text-right p-2">Actions</th>
@@ -644,6 +656,14 @@ function InvoicesView({
                 </tr>
               )}
             </tbody>
+            <tfoot>
+              <tr className="font-bold border-t-2">
+                <td colSpan={5} className="p-2 text-right">Totals:</td>
+                <td className="p-2 text-emerald-600">{formatPKR(totals.received)}</td>
+                <td className="p-2 text-red-600">{formatPKR(totals.pending)}</td>
+                <td className="p-2"></td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       </Card>
@@ -672,6 +692,9 @@ function InvoiceForm({ settings, customerId, onSubmit }) {
       onSubmit={(e) => {
         e.preventDefault();
         if (!customerId) return;
+        const totalCost = roundAbout(total);
+        const received = roundAbout(Number(amountReceived) || 0);
+
         onSubmit({
           customerId,
           date,
@@ -679,9 +702,9 @@ function InvoiceForm({ settings, customerId, onSubmit }) {
           endTime,
           ratePerMinute,
           durationMinutes: mins,
-          totalCost: total,
-          amountReceived: Number(amountReceived) || 0,
-          amountPending: total - (Number(amountReceived) || 0),
+          totalCost: totalCost,
+          amountReceived: received,
+          amountPending: totalCost - received,
         });
         setAmountReceived(0);
       }}
@@ -723,7 +746,7 @@ function InvoiceForm({ settings, customerId, onSubmit }) {
         <Label>Amount Received (PKR)</Label>
         <Input
           type="number"
-          step="0.01"
+          step="1"
           value={amountReceived}
           onChange={(e) => setAmountReceived(e.target.value as any)}
         />
@@ -734,8 +757,7 @@ function InvoiceForm({ settings, customerId, onSubmit }) {
         </div>
         <div className="text-sm text-gray-600">
           Total Cost:{' '}
-          <span className="font-medium">{formatPKR(total)}</span>{' '}
-          <span className="text-gray-400">(≈ {roundAbout(total)})</span>
+          <span className="font-medium">{formatPKR(total)}</span>
         </div>
         <Btn className="mt-3 bg-indigo-600 text-white">Create Invoice</Btn>
       </div>
@@ -745,11 +767,6 @@ function InvoiceForm({ settings, customerId, onSubmit }) {
 
 function InvoiceRow({ inv, settings, onUpdate, onDelete }) {
   const [isEditing, setIsEditing] = useState(false);
-
-  const mins = inv.durationMinutes;
-  const total = inv.totalCost;
-  const rounded = roundAbout(total);
-  const pending = inv.amountPending;
 
   const printSingleInvoice = () => {
     const win = window.open('', '_blank');
@@ -777,23 +794,23 @@ function InvoiceRow({ inv, settings, onUpdate, onDelete }) {
             <div class="row"><strong>Date:</strong> <span>${inv.date}</span></div>
             <div class="row"><strong>Time:</strong> <span>${
               inv.startTime
-            } - ${inv.endTime} (${mins} minutes)</span></div>
+            } - ${inv.endTime} (${inv.durationMinutes} minutes)</span></div>
             <table>
               <thead><tr><th>Description</th><th>Rate/min</th><th>Total</th></tr></thead>
               <tbody>
                 <tr>
-                  <td>Water Supply (${mins} minutes)</td>
+                  <td>Water Supply (${inv.durationMinutes} minutes)</td>
                   <td>PKR ${(
                     inv.ratePerMinute ?? settings.ratePerMinute
                   ).toFixed(3)}</td>
-                  <td>PKR ${total.toFixed(2)} (≈ ${rounded})</td>
+                  <td>PKR ${inv.totalCost.toFixed(2)}</td>
                 </tr>
               </tbody>
             </table>
             <div class="row" style="margin-top:12px;"><strong>Amount Received:</strong> <span>PKR ${(
               inv.amountReceived ?? 0
             ).toFixed(2)}</span></div>
-            <div class="row"><strong>Amount Pending:</strong> <span>PKR ${pending.toFixed(
+            <div class="row"><strong>Amount Pending:</strong> <span>PKR ${inv.amountPending.toFixed(
               2
             )}</span></div>
           </div>
@@ -815,19 +832,18 @@ function InvoiceRow({ inv, settings, onUpdate, onDelete }) {
       <td className="p-2">
         {inv.startTime} - {inv.endTime}
       </td>
-      <td className="p-2">{mins} min</td>
+      <td className="p-2">{inv.durationMinutes} min</td>
       <td className="p-2">
         {(inv.ratePerMinute ?? settings.ratePerMinute).toFixed(3)}
       </td>
-      <td className="p-2">{total.toFixed(2)}</td>
-      <td className="p-2">≈ {rounded}</td>
-      <td className="p-2">{(inv.amountReceived ?? 0).toFixed(2)}</td>
+      <td className="p-2">{roundAbout(inv.totalCost)}</td>
+      <td className="p-2">{roundAbout(inv.amountReceived ?? 0)}</td>
       <td
         className={`p-2 ${
-          pending > 0 ? 'text-red-600' : 'text-emerald-600'
+          inv.amountPending > 0 ? 'text-red-600' : 'text-emerald-600'
         }`}
       >
-        {pending.toFixed(2)}
+        {roundAbout(inv.amountPending)}
       </td>
       <td className="p-2 text-right">
         <div className="flex justify-end gap-2">
@@ -868,7 +884,7 @@ function EditInvoiceForm({ inv, settings, onSave, onCancel }) {
 
   const handleSave = () => {
     const { date, startTime, endTime, amountReceived } = formData;
-    const ratePerMinute = inv.ratePerMinute ?? settings.ratePerMinute; // Keep original rate
+    const ratePerMinute = inv.ratePerMinute ?? settings.ratePerMinute;
     const newMins = minutesBetween(startTime, endTime);
     if (isNaN(newMins)) {
         alert("Invalid time format.");
@@ -879,20 +895,16 @@ function EditInvoiceForm({ inv, settings, onSave, onCancel }) {
         alert("Invalid rate per minute.");
         return;
     }
-
-    if (isNaN(amountReceived)) {
-        alert("Invalid amount received.");
-        return;
-    }
     
-    const newTotal = newMins * ratePerMinute;
-    const newPending = newTotal - amountReceived;
+    const newTotal = roundAbout(newMins * ratePerMinute);
+    const newReceived = roundAbout(Number(amountReceived) || 0);
+    const newPending = newTotal - newReceived;
     onSave({
       date,
       startTime,
       endTime,
       ratePerMinute,
-      amountReceived,
+      amountReceived: newReceived,
       durationMinutes: newMins,
       totalCost: newTotal,
       amountPending: newPending,
@@ -930,11 +942,11 @@ function EditInvoiceForm({ inv, settings, onSave, onCancel }) {
           </div>
           <div className="col-span-2">
             <Label>Rate per Minute (PKR)</Label>
-            <Input type="number" step="0.001" name="ratePerMinute" value={formData.ratePerMinute} readOnly className="bg-gray-100" />
+            <Input type="number" step="0.001" name="ratePerMinute" value={formData.ratePerMinute.toFixed(3)} readOnly className="bg-gray-100" />
           </div>
            <div className="col-span-2">
             <Label>Amount Received (PKR)</Label>
-            <Input type="number" step="0.01" name="amountReceived" value={formData.amountReceived} onChange={handleChange} />
+            <Input type="number" step="1" name="amountReceived" value={formData.amountReceived} onChange={handleChange} />
           </div>
           <div className="col-span-2 flex items-end gap-2">
             <Btn className="w-full bg-indigo-600 text-white" onClick={handleSave}>Save</Btn>
@@ -1046,8 +1058,7 @@ function HelpView() {
           <em>rate per minute</em>.
         </li>
         <li>
-          <strong>Rounding:</strong> Alongside the exact amount (e.g., 999.86),
-          the app shows a <em>round about</em> figure (≈ 1000).
+          <strong>Rounding:</strong> All amounts are rounded to the nearest whole number.
         </li>
         <li>
           <strong>Payments:</strong> Enter <em>Amount Received</em> to track{' '}
