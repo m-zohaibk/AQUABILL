@@ -4,23 +4,19 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Customer",
       "type": "object",
-      "description": "Represents a customer using the AquaBill service.",
+      "description": "Represents a customer with their contact information.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the customer entity."
+          "description": "Unique identifier for the customer."
         },
         "name": {
           "type": "string",
-          "description": "The full name of the customer."
+          "description": "The name of the customer."
         },
         "contactDetails": {
           "type": "string",
-          "description": "Contact information for the customer (e.g., phone number, email address)."
-        },
-        "address": {
-          "type": "string",
-          "description": "The address of the customer."
+          "description": "The contact details of the customer (e.g., phone number, email)."
         }
       },
       "required": [
@@ -33,11 +29,11 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Invoice",
       "type": "object",
-      "description": "Represents an invoice for water supply to a customer.",
+      "description": "Represents an invoice for water supply.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the invoice entity."
+          "description": "Unique identifier for the invoice."
         },
         "customerId": {
           "type": "string",
@@ -45,38 +41,38 @@
         },
         "date": {
           "type": "string",
-          "description": "The date the invoice was issued.",
+          "description": "The date of the invoice.",
           "format": "date-time"
         },
         "startTime": {
           "type": "string",
-          "description": "The start time of the water supply period.",
+          "description": "The start time of water supply.",
           "format": "date-time"
         },
         "endTime": {
           "type": "string",
-          "description": "The end time of the water supply period.",
+          "description": "The end time of water supply.",
           "format": "date-time"
         },
         "ratePerMinute": {
           "type": "number",
-          "description": "The rate charged per minute of water supply."
+          "description": "The rate per minute for water supply."
         },
         "durationMinutes": {
           "type": "number",
-          "description": "The calculated duration in minutes of the water supply."
+          "description": "The duration of water supply in minutes."
         },
         "totalCost": {
           "type": "number",
-          "description": "The calculated total cost of the water supply."
+          "description": "The total cost of water supply."
         },
         "amountReceived": {
           "type": "number",
-          "description": "The amount of payment received for the invoice."
+          "description": "The amount received for the invoice."
         },
         "amountPending": {
           "type": "number",
-          "description": "The amount of payment pending for the invoice."
+          "description": "The amount pending for the invoice."
         }
       },
       "required": [
@@ -100,7 +96,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the setting entity."
+          "description": "Unique identifier for the setting."
         },
         "ratePerMinute": {
           "type": "number",
@@ -108,11 +104,11 @@
         },
         "businessName": {
           "type": "string",
-          "description": "The name of the business providing the water supply service."
+          "description": "The name of the business."
         },
         "contactInformation": {
           "type": "string",
-          "description": "Contact information for the business (e.g., phone number, email address)."
+          "description": "The contact information of the business."
         },
         "address": {
           "type": "string",
@@ -120,7 +116,11 @@
         }
       },
       "required": [
-        "id"
+        "id",
+        "ratePerMinute",
+        "businessName",
+        "contactInformation",
+        "address"
       ]
     }
   },
@@ -133,58 +133,66 @@
   "firestore": {
     "structure": [
       {
-        "path": "/customers/{customerId}",
+        "path": "/users/{userId}/customers/{customerId}",
         "definition": {
           "entityName": "Customer",
           "schema": {
             "$ref": "#/backend/entities/Customer"
           },
-          "description": "Stores customer data.  Unrestricted access for all users.",
+          "description": "Stores customer data specific to each user. Path-based ownership ensures that only the user can access their customer data.",
           "params": [
             {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
               "name": "customerId",
-              "description": "Unique identifier for the customer."
+              "description": "The unique identifier for the customer."
             }
           ]
         }
       },
       {
-        "path": "/customers/{customerId}/invoices/{invoiceId}",
+        "path": "/users/{userId}/invoices/{invoiceId}",
         "definition": {
           "entityName": "Invoice",
           "schema": {
             "$ref": "#/backend/entities/Invoice"
           },
-          "description": "Stores invoices associated with a specific customer. Unrestricted access for all users.",
+          "description": "Stores invoice data specific to each user. Path-based ownership ensures that only the user can access their invoice data.",
           "params": [
             {
-              "name": "customerId",
-              "description": "Unique identifier for the customer."
+              "name": "userId",
+              "description": "The unique identifier for the user."
             },
             {
               "name": "invoiceId",
-              "description": "Unique identifier for the invoice."
+              "description": "The unique identifier for the invoice."
             }
           ]
         }
       },
       {
-        "path": "/settings/{settingId}",
+        "path": "/users/{userId}/settings/{settingId}",
         "definition": {
           "entityName": "Setting",
           "schema": {
             "$ref": "#/backend/entities/Setting"
           },
-          "description": "Stores application settings. Only one setting document is expected. Unrestricted access for all users.",
+          "description": "Stores settings data specific to each user. Path-based ownership ensures that only the user can access their settings data.",
           "params": [
             {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
               "name": "settingId",
-              "description": "Unique identifier for the setting (e.g., 'default')."
+              "description": "The unique identifier for the setting."
             }
           ]
         }
       }
     ],
-    "reasoning": "Given the requirement to allow all permissions to every user, the Firestore structure is simplified. Since there are no access restrictions, we can focus on organizing the data for efficient querying and management, rather than complex security rules. The structure is designed to optimize for the UI features: Customer Management, Invoice Generation & Tracking, Settings Management, and Reporting. The use of subcollections is appropriate for the one-to-many relationship between Customers and Invoices. No denormalization is required as there are no security rules to enforce. QAPs are trivially supported because there are no list restrictions."
+    "reasoning": "Given the requirement for a single user to manage all data without complex role-based access control, the data structure is designed to be simple and straightforward, focusing on path-based ownership under the user's UID. This approach ensures that all data is private to the user and simplifies security rules.  Since all data is private to the user, no denormalization of authorization data is required. QAPs are supported as there is no list operation restrictions."
   }
 }

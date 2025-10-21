@@ -1,59 +1,106 @@
 /**
  * @file Firestore Security Rules
- * @description This ruleset allows unrestricted access to all data.
- *
- * Core Philosophy:
- * The application requires no authorization restrictions, so all read and write operations are allowed for all users.
+ * @description This ruleset enforces a strict user-ownership model, ensuring that each user can only access data associated with their own user ID.
  *
  * Data Structure:
- * - /customers/{customerId}: Stores customer data.
- * - /customers/{customerId}/invoices/{invoiceId}: Stores invoices associated with a specific customer.
- * - /settings/{settingId}: Stores application settings.
+ * All data is nested under /users/{userId}, which creates a private data tree for each user.  Customers, Invoices, and Settings are stored within each user's document.
  *
  * Key Security Decisions:
- * - No access restrictions are enforced. All users can read and write all data.
+ * - No listing of all users is permitted.
+ * - There are no public collections.
+ * - The rules default to strict ownership; any ambiguous relationships are denied by default.
+ *
+ * Access Control Patterns:
+ * - Ownership: Used for all data access under /users/{userId}.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows unrestricted access to customer data.
-     * @path /customers/{customerId}
-     * @allow (get, list) Any user can read customer data.
-     * @allow (create, update, delete) Any user can modify customer data.
-     * @deny None. All requests are allowed.
-     * @principle No authorization is required.
+     * @description Checks if the request is made by the owner of the resource.
+     * @param {string} userId The user ID to compare against the request's authentication UID.
+     * @return {bool} True if the user is signed in and the UID matches the provided userId, false otherwise.
      */
-    match /customers/{customerId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
     }
 
     /**
-     * @description Allows unrestricted access to invoices associated with a customer.
-     * @path /customers/{customerId}/invoices/{invoiceId}
-     * @allow (get, list) Any user can read invoice data.
-     * @allow (create, update, delete) Any user can modify invoice data.
-     * @deny None. All requests are allowed.
-     * @principle No authorization is required.
+     * @description Checks if the user is signed in.
+     * @return {bool} True if the user is signed in, false otherwise.
      */
-    match /customers/{customerId}/invoices/{invoiceId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+    function isSignedIn() {
+      return request.auth != null;
     }
 
     /**
-     * @description Allows unrestricted access to application settings.
-     * @path /settings/{settingId}
-     * @allow (get, list) Any user can read application settings.
-     * @allow (create, update, delete) Any user can modify application settings.
-     * @deny None. All requests are allowed.
-     * @principle No authorization is required.
+     * @description Checks if the user is the owner of the existing resource.
+     * @param {string} userId The user ID to compare against the resource's data.
+     * @return {bool} True if the user is the owner and the resource exists, false otherwise.
      */
-    match /settings/{settingId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+    function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * @description Defines security rules for customer documents under a user's collection.
+     * @path /users/{userId}/customers/{customerId}
+     * @allow (create) User 'user123' can create a customer document under their own user ID ('user123').
+     * @allow (get) User 'user123' can read their own customer document.
+     * @deny (create) User 'user456' cannot create a customer document under user 'user123'.
+     * @deny (update) User 'user456' cannot update a customer document under user 'user123'.
+     * @principle Enforces document ownership for writes, restricts access to a user's own data tree.
+     */
+    match /users/{userId}/customers/{customerId} {
+      // Read rules
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+
+      // Write rules
+      allow create: if isOwner(userId) && request.resource.data.id == customerId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Defines security rules for invoice documents under a user's collection.
+     * @path /users/{userId}/invoices/{invoiceId}
+     * @allow (create) User 'user123' can create an invoice document under their own user ID ('user123').
+     * @allow (get) User 'user123' can read their own invoice document.
+     * @deny (create) User 'user456' cannot create an invoice document under user 'user123'.
+     * @deny (update) User 'user456' cannot update an invoice document under user 'user123'.
+     * @principle Enforces document ownership for writes, restricts access to a user's own data tree.
+     */
+    match /users/{userId}/invoices/{invoiceId} {
+      // Read rules
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+
+      // Write rules
+      allow create: if isOwner(userId) && request.resource.data.id == invoiceId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Defines security rules for settings documents under a user's collection.
+     * @path /users/{userId}/settings/{settingId}
+     * @allow (create) User 'user123' can create a settings document under their own user ID ('user123').
+     * @allow (get) User 'user123' can read their own settings document.
+     * @deny (create) User 'user456' cannot create a settings document under user 'user123'.
+     * @deny (update) User 'user456' cannot update a settings document under user 'user123'.
+     * @principle Enforces document ownership for writes, restricts access to a user's own data tree.
+     */
+    match /users/{userId}/settings/{settingId} {
+      // Read rules
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+
+      // Write rules
+      allow create: if isOwner(userId) && request.resource.data.id == settingId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
     }
   }
 }
