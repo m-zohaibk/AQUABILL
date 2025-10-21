@@ -302,7 +302,7 @@ function App() {
           </div>
           <div className="flex items-center gap-2">
            <Btn
-              className={`hidden sm:inline-flex ${
+              className={`inline-flex ${
                 !selectedCustomerId && view === 'invoices' ? 'bg-indigo-600 text-white' : ''
               }`}
               onClick={handleViewAllCustomers}
