@@ -14,7 +14,7 @@ import {
   deleteDocumentNonBlocking,
   FirebaseClientProvider,
 } from '@/firebase';
-import { collection, doc, getDocs } from 'firebase/firestore';
+import { collection, doc, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,38 +26,28 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
+import {
+  DollarSign,
+  Users,
+  Receipt,
+  FileDown,
+  Printer,
+  Pencil,
+  Trash2,
+  PlusCircle,
+  FileCog,
+  FileUp,
+  BookUser,
+  LayoutDashboard,
+  HelpCircle,
+  Briefcase
+} from 'lucide-react';
 
-// --- Simple UI primitives (Tailwind-only) to avoid external UI deps ---
-const Btn = ({ children, className = '', ...props }) => (
-  <button
-    className={`px-3 py-2 rounded-xl shadow-sm border text-sm hover:shadow transition disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
-    {...props}
-  >
-    {children}
-  </button>
-);
-const Input = ({ className = '', ...props }) => (
-  <input
-    className={`w-full px-3 py-2 rounded-xl border outline-none focus:ring focus:ring-indigo-200 ${className}`}
-    {...props}
-  />
-);
-const Label = ({ children, className = '', ...props }) => (
-  <label className={`text-sm text-gray-700 ${className}`} {...props}>
-    {children}
-  </label>
-);
-const Card = ({ children, className = '', ...props }) => (
-  <div
-    className={`rounded-2xl border bg-white shadow-sm ${className}`}
-    {...props}
-  >
-    {children}
-  </div>
-);
-const SectionTitle = ({ children }) => (
-  <h2 className="text-lg font-semibold tracking-tight">{children}</h2>
-);
 
 // --- Helpers ---
 const parseTimeToMinutes = (timeStr) => {
@@ -78,7 +68,7 @@ const roundAbout = (num) => Math.round(num);
 
 const formatPKR = (num) => {
   if (isNaN(num)) return 'PKR 0';
-  return `PKR ${roundAbout(num)}`;
+  return `PKR ${new Intl.NumberFormat('en-PK').format(roundAbout(num))}`;
 };
 
 
@@ -160,13 +150,14 @@ function App() {
 
   const deleteCustomer = (id) => {
     if (!firestore) return;
+    // A more complex implementation (e.g., a cloud function) is needed to delete subcollections.
+    // For now, we will just delete the customer document.
     const customerDoc = doc(firestore, 'customers', id);
     deleteDocumentNonBlocking(customerDoc);
-    // Note: Deleting subcollections needs a more complex implementation (e.g., a cloud function)
-    // For now, invoices will be orphaned but won't appear in the UI.
     if (selectedCustomerId === id) setSelectedCustomerId(null);
     setCustomerToDelete(null);
   };
+
 
   // Actions: Invoices
   const addInvoice = (payload) => {
@@ -244,7 +235,6 @@ function App() {
       .map((i) => {
         const mins = i.durationMinutes;
         const total = i.totalCost;
-        const rounded = roundAbout(total);
         return [
           i.date,
           `${i.startTime} - ${i.endTime}`,
@@ -271,7 +261,7 @@ function App() {
       ],
       body: rows,
       styles: { fontSize: 9 },
-      headStyles: { fillColor: [66, 99, 235] },
+      headStyles: { fillColor: [37, 99, 235] },
       theme: 'striped',
     });
 
@@ -284,115 +274,129 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-white">
-      <header className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <header className="sticky top-0 z-10 bg-white/80 dark:bg-gray-900/80 backdrop-blur border-b">
+        <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="size-9 grid place-content-center rounded-xl bg-indigo-600 text-white font-bold">
-              TW
-            </span>
+             <Briefcase className="h-8 w-8 text-primary" />
             <div>
-              <h1 className="text-xl font-bold">
-                Tubewell Water Supply Invoice
+              <h1 className="text-xl font-bold tracking-tight">
+                AquaBill
               </h1>
               <p className="text-xs text-gray-500">
-                Manage customers, create invoices, and track payments.
+                Simple Water Supply Invoicing
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-           <Btn
-              className={`inline-flex ${
-                !selectedCustomerId && view === 'invoices' ? 'bg-indigo-600 text-white' : ''
-              }`}
+           <Button
+              variant={!selectedCustomerId && view === 'invoices' ? 'default' : 'ghost'}
+              size="sm"
               onClick={handleViewAllCustomers}
+              className="inline-flex items-center gap-2"
             >
+              <LayoutDashboard className="h-4 w-4" />
               Dashboard
-            </Btn>
-            <Btn
-              className={`${
-                view === 'settings' ? 'bg-indigo-600 text-white' : ''
-              }`}
+            </Button>
+            <Button
+              variant={view === 'settings' ? 'default' : 'ghost'}
+              size="sm"
               onClick={() => setView('settings')}
+              className="inline-flex items-center gap-2"
             >
+              <FileCog className="h-4 w-4" />
               Settings
-            </Btn>
-            <Btn
-              className={`${view === 'about' ? 'bg-indigo-600 text-white' : ''}`}
+            </Button>
+            <Button
+              variant={view === 'about' ? 'default' : 'ghost'}
+              size="sm"
               onClick={() => setView('about')}
+               className="inline-flex items-center gap-2"
             >
+              <HelpCircle className="h-4 w-4" />
               Help
-            </Btn>
+            </Button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-[320px,1fr] gap-6">
+      <main className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-6 grid grid-cols-1 lg:grid-cols-[380px,1fr] gap-6">
         {/* Sidebar */}
-        <aside>
-          <Card className="p-4">
-            <SectionTitle>Customers</SectionTitle>
-            <div className="mt-3">
+        <aside className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5" /> Customers</CardTitle>
+            </CardHeader>
+            <CardContent>
               <Input
                 placeholder="Search by name or number..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
-            </div>
-            <div className="mt-3 space-y-2 max-h-[52vh] overflow-auto pr-1">
-              {(filteredCustomers || []).map((c) => (
-                <div
-                  key={c.id}
-                  className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${
-                    selectedCustomerId === c.id
-                      ? 'bg-indigo-50 border-indigo-200'
-                      : 'bg-white'
-                  }`}
-                >
-                  <button
-                    className="text-left flex-1"
-                    onClick={() => {
-                      setSelectedCustomerId(c.id);
-                      setView('invoices');
-                    }}
+              <div className="mt-3 space-y-2 max-h-[calc(100vh-420px)] overflow-auto pr-1">
+                {(filteredCustomers || []).map((c) => (
+                  <div
+                    key={c.id}
+                    className={`p-3 rounded-lg border flex items-center justify-between gap-3 transition-colors ${
+                      selectedCustomerId === c.id
+                        ? 'bg-primary/10 border-primary'
+                        : 'bg-transparent hover:bg-gray-50 dark:hover:bg-gray-800'
+                    }`}
                   >
-                    <div className="font-medium">{c.name}</div>
-                    <div className="text-xs text-gray-500">
-                      {c.contact || 'No contact'}
-                    </div>
-                  </button>
-                  <div className="flex gap-2">
-                    <Btn
-                      className="text-xs"
+                    <button
+                      className="text-left flex-1"
                       onClick={() => {
-                        const name = prompt('Customer name', c.name);
-                        if (!name) return;
-                        const contact = prompt('Contact number', c.contact || '');
-                        updateCustomer(c.id, { name, contact });
+                        setSelectedCustomerId(c.id);
+                        setView('invoices');
                       }}
                     >
-                      Edit
-                    </Btn>
-                    <Btn
-                      className="text-xs border-red-200 text-red-600"
-                      onClick={() => setCustomerToDelete(c)}
-                    >
-                      Del
-                    </Btn>
+                      <div className="font-medium">{c.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {c.contact || 'No contact'}
+                      </div>
+                    </button>
+                    <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          const name = prompt('Customer name', c.name);
+                          if (!name) return;
+                          const contact = prompt('Contact number', c.contact || '');
+                          updateCustomer(c.id, { name, contact });
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => setCustomerToDelete(c)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              ))}
-              {filteredCustomers && filteredCustomers.length === 0 && (
-                <p className="text-sm text-gray-500 py-4 text-center">
-                  No customers found.
-                </p>
-              )}
-            </div>
+                ))}
+                {filteredCustomers && filteredCustomers.length === 0 && (
+                  <p className="text-sm text-muted-foreground py-4 text-center">
+                    No customers found.
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
-            <div className="mt-4 p-3 rounded-xl bg-gray-50 border">
-              <SectionTitle>Add Customer</SectionTitle>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <PlusCircle className="h-5 w-5" /> Add Customer
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
               <CustomerForm onSubmit={addCustomer} />
-            </div>
+            </CardContent>
           </Card>
         </aside>
 
@@ -430,9 +434,8 @@ function App() {
         </section>
       </main>
 
-      <footer className="max-w-7xl mx-auto px-4 pb-6 text-center text-xs text-gray-500">
-        © {new Date().getFullYear()} Tubewell Water Supply — Simple Invoice
-        Management.
+      <footer className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 text-center text-xs text-muted-foreground">
+        © {new Date().getFullYear()} AquaBill — Simple Water Supply Invoicing.
       </footer>
       
       {customerToDelete && (
@@ -452,7 +455,7 @@ function CustomerForm({ onSubmit }) {
   const [contact, setContact] = useState('');
   return (
     <form
-      className="mt-3 grid grid-cols-1 gap-3"
+      className="grid grid-cols-1 gap-4"
       onSubmit={(e) => {
         e.preventDefault();
         if (!name.trim()) return alert('Enter customer name');
@@ -461,7 +464,7 @@ function CustomerForm({ onSubmit }) {
         setContact('');
       }}
     >
-      <div>
+      <div className="space-y-2">
         <Label>Customer Name</Label>
         <Input
           value={name}
@@ -469,7 +472,7 @@ function CustomerForm({ onSubmit }) {
           placeholder="e.g., Ali Khan"
         />
       </div>
-      <div>
+      <div className="space-y-2">
         <Label>Contact Number</Label>
         <Input
           value={contact}
@@ -477,7 +480,10 @@ function CustomerForm({ onSubmit }) {
           placeholder="03XX-XXXXXXX"
         />
       </div>
-      <Btn className="bg-indigo-600 text-white">Add Customer</Btn>
+      <Button type="submit" className="w-full">
+        <PlusCircle className="mr-2 h-4 w-4" />
+        Add Customer
+      </Button>
     </form>
   );
 }
@@ -490,28 +496,25 @@ function DashboardView({ customers, firestore, settings }) {
     totalCustomers: 0,
     totalInvoices: 0,
   });
+  const [recentInvoices, setRecentInvoices] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchAllInvoices() {
-      if (!firestore || !customers || customers.length === 0) {
-        setStats({
-          totalReceived: 0,
-          totalPending: 0,
-          totalCustomers: customers?.length || 0,
-          totalInvoices: 0,
-        });
+    async function fetchData() {
+      if (!firestore) {
         setIsLoading(false);
         return;
       }
 
       setIsLoading(true);
+      
+      // Fetch all invoices for stats
       let allInvoices = [];
-      for (const customer of customers) {
+      for (const customer of (customers || [])) {
         const invoicesColRef = collection(firestore, 'customers', customer.id, 'invoices');
         const querySnapshot = await getDocs(invoicesColRef);
         querySnapshot.forEach((doc) => {
-          allInvoices.push(doc.data());
+          allInvoices.push({ ...doc.data(), customerName: customer.name });
         });
       }
       
@@ -521,60 +524,128 @@ function DashboardView({ customers, firestore, settings }) {
       setStats({
         totalReceived,
         totalPending,
-        totalCustomers: customers.length,
+        totalCustomers: customers?.length || 0,
         totalInvoices: allInvoices.length,
       });
+
+      // Fetch recent 5 invoices
+      allInvoices.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setRecentInvoices(allInvoices.slice(0, 5));
+
       setIsLoading(false);
     }
 
-    fetchAllInvoices();
+    fetchData();
   }, [customers, firestore]);
 
   if (isLoading) {
     return (
-      <Card className="p-6 text-center">
-        <p>Loading dashboard...</p>
-      </Card>
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Business Dashboard</CardTitle>
+            <CardDescription>An overview of your business performance.</CardDescription>
+          </CardHeader>
+        </Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card><CardHeader><div className="h-16"></div></CardHeader></Card>
+          <Card><CardHeader><div className="h-16"></div></CardHeader></Card>
+          <Card><CardHeader><div className="h-16"></div></CardHeader></Card>
+          <Card><CardHeader><div className="h-16"></div></CardHeader></Card>
+        </div>
+      </div>
     );
   }
 
   return (
     <div className="space-y-6">
-       <Card className="p-6">
-        <SectionTitle>Business Dashboard</SectionTitle>
-         <p className="text-sm text-gray-500 mt-1">An overview of your business performance.</p>
+       <Card>
+        <CardHeader>
+          <CardTitle>Business Dashboard</CardTitle>
+          <CardDescription>An overview of your business performance.</CardDescription>
+        </CardHeader>
        </Card>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-4">
-          <h3 className="text-sm font-medium text-gray-500">Total Amount Received</h3>
-          <p className="mt-1 text-3xl font-semibold text-emerald-600">{formatPKR(stats.totalReceived)}</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Received</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-emerald-600">{formatPKR(stats.totalReceived)}</div>
+            <p className="text-xs text-muted-foreground">Across all invoices</p>
+          </CardContent>
         </Card>
-        <Card className="p-4">
-          <h3 className="text-sm font-medium text-gray-500">Total Amount Pending</h3>
-          <p className="mt-1 text-3xl font-semibold text-red-600">
-            {formatPKR(stats.totalPending)}
-          </p>
-           <p className="text-xs text-gray-500">
-            (≈ {roundAbout(stats.totalPending)})
-          </p>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Pending</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{formatPKR(stats.totalPending)}</div>
+            <p className="text-xs text-muted-foreground">
+              (Rounded: {formatPKR(roundAbout(stats.totalPending))})
+            </p>
+          </CardContent>
         </Card>
-        <Card className="p-4">
-          <h3 className="text-sm font-medium text-gray-500">Total Customers</h3>
-          <p className="mt-1 text-3xl font-semibold">{stats.totalCustomers}</p>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Customers</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalCustomers}</div>
+             <p className="text-xs text-muted-foreground">Active customers</p>
+          </CardContent>
         </Card>
-        <Card className="p-4">
-          <h3 className="text-sm font-medium text-gray-500">Total Invoices</h3>
-          <p className="mt-1 text-3xl font-semibold">{stats.totalInvoices}</p>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Invoices</CardTitle>
+            <Receipt className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalInvoices}</div>
+            <p className="text-xs text-muted-foreground">Generated so far</p>
+          </CardContent>
         </Card>
       </div>
-      <Card className="p-6 grid place-content-center min-h-[40vh] text-center">
-        <div>
-          <h3 className="text-xl font-semibold">Select a customer</h3>
-          <p className="text-sm text-gray-500 mt-2">
-            Choose a customer from the left to view and create their invoices.
-          </p>
-        </div>
-      </Card>
+
+       <Card>
+          <CardHeader>
+            <CardTitle>Recent Invoices</CardTitle>
+            <CardDescription>The last 5 invoices created across all customers.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead className="text-right">Total Cost</TableHead>
+                  <TableHead className="text-right">Amount Pending</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {recentInvoices.length > 0 ? recentInvoices.map((inv, index) => (
+                  <TableRow key={index}>
+                    <TableCell className="font-medium">{inv.customerName}</TableCell>
+                    <TableCell>{inv.date}</TableCell>
+                    <TableCell className="text-right">{formatPKR(inv.totalCost)}</TableCell>
+                    <TableCell className={`text-right font-medium ${inv.amountPending > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                      {formatPKR(inv.amountPending)}
+                    </TableCell>
+                  </TableRow>
+                )) : (
+                  <TableRow>
+                    <TableCell colSpan={4} className="h-24 text-center">
+                      No recent invoices.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
     </div>
   );
 }
@@ -593,7 +664,7 @@ function InvoicesView({
 
   const totals = useMemo(() => {
     if (!customerInvoices) return { received: 0, pending: 0 };
-    return customerInvoices.reduce(
+    return (customerInvoices || []).reduce(
       (acc, inv) => {
         acc.received += inv.amountReceived || 0;
         acc.pending += inv.amountPending || 0;
@@ -608,7 +679,7 @@ function InvoicesView({
       <Card className="p-6 grid place-content-center min-h-[60vh] text-center">
         <div>
           <h3 className="text-xl font-semibold">Select a customer</h3>
-          <p className="text-sm text-gray-500 mt-2">
+          <p className="text-sm text-muted-foreground mt-2">
             Choose a customer from the left to view and create invoices.
           </p>
         </div>
@@ -617,54 +688,61 @@ function InvoicesView({
 
   return (
     <div className="space-y-6">
-      <Card className="p-5">
+      <Card>
+       <CardHeader>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div>
-            <h3 className="text-xl font-semibold">{selectedCustomer.name}</h3>
-            <p className="text-sm text-gray-500">
+            <CardTitle className="flex items-center gap-2"><BookUser className="h-6 w-6"/>{selectedCustomer.name}</CardTitle>
+            <CardDescription className="mt-1">
               {selectedCustomer.contact || 'No contact'}
-            </p>
+            </CardDescription>
           </div>
-          <div className="flex gap-2">
-            <Btn className="bg-emerald-600 text-white" onClick={onExportPDF}>
-              Download History PDF
-            </Btn>
-            <Btn
-              className="border-amber-300 text-amber-700"
-              onClick={() => window.print()}
-            >
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={onExportPDF}>
+              <FileDown className="mr-2 h-4 w-4" />
+              Download PDF
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => window.print()}>
+              <Printer className="mr-2 h-4 w-4" />
               Print Page
-            </Btn>
+            </Button>
           </div>
         </div>
+        </CardHeader>
       </Card>
 
-      <Card className="p-5">
-        <SectionTitle>Create New Invoice</SectionTitle>
-        <InvoiceForm
-          settings={settings}
-          customerId={selectedCustomer.id}
-          onSubmit={onAddInvoice}
-        />
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><PlusCircle className="h-5 w-5" />Create New Invoice</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <InvoiceForm
+            settings={settings}
+            customerId={selectedCustomer.id}
+            onSubmit={onAddInvoice}
+          />
+        </CardContent>
       </Card>
 
-      <Card className="p-5">
-        <SectionTitle>Invoices & Payments</SectionTitle>
-        <div className="mt-4 overflow-auto">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="border-b bg-gray-50">
-                <th className="text-left p-2">Date</th>
-                <th className="text-left p-2">Time</th>
-                <th className="text-left p-2">Duration</th>
-                <th className="text-left p-2">Rate/min</th>
-                <th className="text-left p-2">Total</th>
-                <th className="text-left p-2">Received</th>
-                <th className="text-left p-2">Pending</th>
-                <th className="text-right p-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Receipt className="h-5 w-5" />Invoices & Payments</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Time</TableHead>
+                <TableHead>Duration</TableHead>
+                <TableHead>Rate/min</TableHead>
+                <TableHead>Total</TableHead>
+                <TableHead>Received</TableHead>
+                <TableHead>Pending</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {(customerInvoices || []).map((inv) => (
                 <InvoiceRow
                   key={inv.id}
@@ -675,23 +753,23 @@ function InvoicesView({
                 />
               ))}
               {(!customerInvoices || customerInvoices.length === 0) && (
-                <tr>
-                  <td colSpan={8} className="p-4 text-center text-gray-500">
+                <TableRow>
+                  <TableCell colSpan={8} className="p-4 text-center text-muted-foreground">
                     No invoices yet.
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               )}
-            </tbody>
-            <tfoot>
-              <tr className="font-bold border-t-2">
-                <td colSpan={5} className="p-2 text-right">Totals:</td>
-                <td className="p-2 text-emerald-600">{formatPKR(totals.received)}</td>
-                <td className="p-2 text-red-600">{formatPKR(totals.pending)}</td>
-                <td className="p-2"></td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+            </TableBody>
+            <TableFooter>
+              <TableRow className="font-bold text-base">
+                <TableCell colSpan={5} className="p-2 text-right">Totals:</TableCell>
+                <TableCell className="p-2 text-emerald-600">{formatPKR(totals.received)}</TableCell>
+                <TableCell className="p-2 text-red-600">{formatPKR(totals.pending)}</TableCell>
+                <TableCell className="p-2"></TableCell>
+              </TableRow>
+            </TableFooter>
+          </Table>
+        </CardContent>
       </Card>
     </div>
   );
@@ -714,7 +792,7 @@ function InvoiceForm({ settings, customerId, onSubmit }) {
 
   return (
     <form
-      className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+      className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end"
       onSubmit={(e) => {
         e.preventDefault();
         if (!customerId) return;
@@ -735,7 +813,7 @@ function InvoiceForm({ settings, customerId, onSubmit }) {
         setAmountReceived(0);
       }}
     >
-      <div>
+      <div className="space-y-2">
         <Label>Date of Water Supply</Label>
         <Input
           type="date"
@@ -743,7 +821,7 @@ function InvoiceForm({ settings, customerId, onSubmit }) {
           onChange={(e) => setDate(e.target.value)}
         />
       </div>
-      <div>
+      <div className="space-y-2">
         <Label>Supply Time (Start)</Label>
         <Input
           type="time"
@@ -751,7 +829,7 @@ function InvoiceForm({ settings, customerId, onSubmit }) {
           onChange={(e) => setStartTime(e.target.value)}
         />
       </div>
-      <div>
+      <div className="space-y-2">
         <Label>Supply Time (End)</Label>
         <Input
           type="time"
@@ -759,16 +837,16 @@ function InvoiceForm({ settings, customerId, onSubmit }) {
           onChange={(e) => setEndTime(e.target.value)}
         />
       </div>
-      <div>
+      <div className="space-y-2">
         <Label>Rate per Minute (PKR)</Label>
         <Input
           type="number"
-          step="0.001"
+          step="0.01"
           value={ratePerMinute}
           onChange={(e) => setRatePerMinute(Number(e.target.value))}
         />
       </div>
-      <div>
+      <div className="space-y-2">
         <Label>Amount Received (PKR)</Label>
         <Input
           type="number"
@@ -777,15 +855,15 @@ function InvoiceForm({ settings, customerId, onSubmit }) {
           onChange={(e) => setAmountReceived(e.target.value as any)}
         />
       </div>
-      <div className="flex flex-col justify-end">
-        <div className="text-sm text-gray-600">
-          Duration: <span className="font-medium">{mins} minutes</span>
+      <div className="flex flex-col gap-2">
+        <div className="text-sm text-muted-foreground space-y-1 p-2 rounded-md border bg-gray-50 dark:bg-gray-800">
+          <div>Duration: <span className="font-medium">{mins} minutes</span></div>
+          <div>Total Cost: <span className="font-medium">{formatPKR(total)}</span></div>
         </div>
-        <div className="text-sm text-gray-600">
-          Total Cost:{' '}
-          <span className="font-medium">{formatPKR(total)}</span>
-        </div>
-        <Btn className="mt-3 bg-indigo-600 text-white">Create Invoice</Btn>
+        <Button type="submit" className="w-full">
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Create Invoice
+        </Button>
       </div>
     </form>
   );
@@ -853,42 +931,43 @@ function InvoiceRow({ inv, settings, onUpdate, onDelete }) {
   }
 
   return (
-    <tr className="border-b">
-      <td className="p-2">{inv.date}</td>
-      <td className="p-2">
+    <TableRow>
+      <TableCell>{inv.date}</TableCell>
+      <TableCell>
         {inv.startTime} - {inv.endTime}
-      </td>
-      <td className="p-2">{inv.durationMinutes} min</td>
-      <td className="p-2">
+      </TableCell>
+      <TableCell>{inv.durationMinutes} min</TableCell>
+      <TableCell>
         {roundAbout(inv.ratePerMinute ?? settings.ratePerMinute)}
-      </td>
-      <td className="p-2">{roundAbout(inv.totalCost)}</td>
-      <td className="p-2">{roundAbout(inv.amountReceived ?? 0)}</td>
-      <td
-        className={`p-2 ${
+      </TableCell>
+      <TableCell>{formatPKR(inv.totalCost)}</TableCell>
+      <TableCell>{formatPKR(inv.amountReceived ?? 0)}</TableCell>
+      <TableCell
+        className={`font-medium ${
           inv.amountPending > 0 ? 'text-red-600' : 'text-emerald-600'
         }`}
       >
-        {roundAbout(inv.amountPending)}
-      </td>
-      <td className="p-2 text-right">
-        <div className="flex justify-end gap-2">
-          <Btn className="text-xs" onClick={printSingleInvoice}>
-            Print
-          </Btn>
-          <Btn
-            className="text-xs"
+        {formatPKR(inv.amountPending)}
+      </TableCell>
+      <TableCell className="text-right">
+        <div className="flex justify-end gap-1">
+          <Button variant="ghost" size="icon" onClick={printSingleInvoice}><Printer className="h-4 w-4" /></Button>
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => setIsEditing(true)}
           >
-            Edit
-          </Btn>
+            <Pencil className="h-4 w-4" />
+          </Button>
            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
             <AlertDialogTrigger asChild>
-              <Btn
-                className="text-xs border-red-200 text-red-600"
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
               >
-                Delete
-              </Btn>
+                <Trash2 className="h-4 w-4" />
+              </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
@@ -899,13 +978,13 @@ function InvoiceRow({ inv, settings, onUpdate, onDelete }) {
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
+                <AlertDialogAction onClick={handleDelete} asChild><Button variant="destructive">Delete</Button></AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
         </div>
-      </td>
-    </tr>
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -959,42 +1038,42 @@ function EditInvoiceForm({ inv, settings, onSave, onCancel }) {
 
 
   return (
-    <tr className="bg-indigo-50">
-      <td colSpan={8} className="p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
-          <div className="sm:col-span-2">
+    <TableRow className="bg-blue-50/50 dark:bg-blue-900/10">
+      <TableCell colSpan={8} className="p-4">
+        <div className="grid grid-cols-1 sm:grid-cols-5 gap-4 items-end">
+          <div className="space-y-2">
             <Label>Date</Label>
             <Input type="date" name="date" value={formData.date} onChange={handleChange} />
           </div>
-          <div>
+          <div className="space-y-2">
             <Label>Start Time</Label>
             <Input type="time" name="startTime" value={formData.startTime} onChange={handleChange} />
           </div>
-          <div>
+          <div className="space-y-2">
             <Label>End Time</Label>
             <Input type="time" name="endTime" value={formData.endTime} onChange={handleChange} />
           </div>
-           <div className="sm:col-span-2">
-            <Label>Info</Label>
-             <div className="text-xs text-gray-600 mt-2">
-                Duration: {calculated.mins} min, Total: {formatPKR(calculated.total)}
-             </div>
+          <div className="space-y-2">
+            <Label>Rate per Minute</Label>
+            <Input type="number" name="ratePerMinute" value={formData.ratePerMinute} readOnly className="bg-gray-100 dark:bg-gray-800" />
           </div>
-          <div className="sm:col-span-1">
-            <Label>Rate per Minute (PKR)</Label>
-            <Input type="number" step="any" name="ratePerMinute" value={formData.ratePerMinute} readOnly className="bg-gray-100" />
-          </div>
-           <div className="sm:col-span-2">
-            <Label>Amount Received (PKR)</Label>
+           <div className="space-y-2">
+            <Label>Amount Received</Label>
             <Input type="number" step="1" name="amountReceived" value={formData.amountReceived} onChange={handleChange} />
           </div>
+          
+          <div className="sm:col-span-3 text-xs text-muted-foreground p-2 rounded-md border bg-gray-50 dark:bg-gray-800 space-y-1">
+            <div>Duration: <span className="font-medium">{calculated.mins} min</span></div>
+            <div>Total Cost: <span className="font-medium">{formatPKR(calculated.total)}</span></div>
+            <div>Pending: <span className="font-medium">{formatPKR(calculated.pending)}</span></div>
+          </div>
           <div className="sm:col-span-2 flex items-end gap-2">
-            <Btn className="w-full bg-indigo-600 text-white" onClick={handleSave}>Save</Btn>
-            <Btn className="w-full bg-gray-200" onClick={onCancel}>Cancel</Btn>
+            <Button className="w-full" variant="outline" onClick={onCancel}>Cancel</Button>
+            <Button className="w-full" onClick={handleSave}>Save Changes</Button>
           </div>
         </div>
-      </td>
-    </tr>
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -1004,123 +1083,126 @@ function SettingsView({ settings, onChange, onExport, onImport }) {
   useEffect(() => setLocal(settings), [settings]);
 
   return (
-    <Card className="p-6 space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <SectionTitle>Settings</SectionTitle>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><FileCog className="h-5 w-5" />Settings</CardTitle>
+        <CardDescription>Manage your business information and default rates.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Rate Per Minute (PKR)</Label>
+            <Input
+              type="number"
+              step="0.01"
+              value={local.ratePerMinute}
+              onChange={(e) =>
+                setLocal({ ...local, ratePerMinute: Number(e.target.value) })
+              }
+            />
+            <p className="text-xs text-muted-foreground">
+              Default billing rate. E.g., 1000 PKR/hour is 16.67 PKR/min.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label>Business Name</Label>
+            <Input
+              value={local.businessName}
+              onChange={(e) =>
+                setLocal({ ...local, businessName: e.target.value })
+              }
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Business Contact</Label>
+            <Input
+              value={local.businessContact}
+              onChange={(e) =>
+                setLocal({ ...local, businessContact: e.target.value })
+              }
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Business Address</Label>
+            <Input
+              value={local.businessAddress}
+              onChange={(e) =>
+                setLocal({ ...local, businessAddress: e.target.value })
+              }
+            />
+          </div>
+        </div>
+        <div className="pt-4 border-t">
+            <h3 className="font-semibold tracking-tight">Notes</h3>
+            <ul className="list-disc pl-5 text-sm text-muted-foreground mt-2 space-y-1">
+              <li>All data is stored in a free cloud database (Firestore).</li>
+              <li>You can export/import <strong>Settings</strong> as a JSON file to easily change the rate in the future.</li>
+              <li>Use "Print" on a specific invoice row for a clean, printable invoice format.</li>
+            </ul>
+        </div>
+      </CardContent>
+      <CardFooter className="justify-between border-t pt-6">
         <div className="flex gap-2">
-          <Btn onClick={onExport}>Export Settings</Btn>
-          <label className="px-3 py-2 rounded-2xl border text-sm cursor-pointer">
-            Import Settings
-            <input type="file" accept="application/json" className="hidden" onChange={(e) => e.target.files?.[0] && onImport(e.target.files[0])} />
-          </label>
+          <Button variant="outline" onClick={onExport}><FileDown className="mr-2 h-4 w-4" />Export Settings</Button>
+          <Button variant="outline" asChild>
+            <label>
+              <FileUp className="mr-2 h-4 w-4" /> Import Settings
+              <input type="file" accept="application/json" className="hidden" onChange={(e) => e.target.files?.[0] && onImport(e.target.files[0])} />
+            </label>
+          </Button>
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <Label>Rate Per Minute (PKR)</Label>
-          <Input
-            type="number"
-            step="0.001"
-            value={local.ratePerMinute}
-            onChange={(e) =>
-              setLocal({ ...local, ratePerMinute: Number(e.target.value) })
-            }
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            Billing uses: Total Cost = Duration (minutes) × Rate. Default is
-            16.666 PKR/min.
-          </p>
+        <div className="flex gap-2">
+          <Button variant="ghost" onClick={() => setLocal(settings)}>Reset</Button>
+          <Button onClick={() => onChange(local)}>
+            Save Changes
+          </Button>
         </div>
-        <div>
-          <Label>Business Name</Label>
-          <Input
-            value={local.businessName}
-            onChange={(e) =>
-              setLocal({ ...local, businessName: e.target.value })
-            }
-          />
-        </div>
-        <div>
-          <Label>Business Contact</Label>
-          <Input
-            value={local.businessContact}
-            onChange={(e) =>
-              setLocal({ ...local, businessContact: e.target.value })
-            }
-          />
-        </div>
-        <div>
-          <Label>Business Address</Label>
-          <Input
-            value={local.businessAddress}
-            onChange={(e) =>
-              setLocal({ ...local, businessAddress: e.target.value })
-            }
-          />
-        </div>
-      </div>
-
-      <div className="flex justify-end gap-2">
-        <Btn onClick={() => setLocal(settings)}>Reset</Btn>
-        <Btn
-          className="bg-indigo-600 text-white"
-          onClick={() => onChange(local)}
-        >
-          Save Changes
-        </Btn>
-      </div>
-
-      <div className="pt-4 border-t">
-        <SectionTitle>Notes</SectionTitle>
-        <ul className="list-disc pl-5 text-sm text-gray-600 mt-2 space-y-1">
-          <li>All data is now stored in a free cloud database (Firestore).</li>
-          <li>You can export/import <strong>Settings</strong> as a JSON file to easily change the rate in the future.</li>
-          <li>Use "Print" on a specific invoice row for a clean, printable invoice format.</li>
-        </ul>
-      </div>
+      </CardFooter>
     </Card>
   );
 }
 
 function HelpView() {
   return (
-    <Card className="p-6 space-y-4">
-      <SectionTitle>How to Use</SectionTitle>
-      <ol className="list-decimal pl-5 space-y-2 text-sm text-gray-700">
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><HelpCircle className="h-5 w-5" />How to Use</CardTitle>
+      </CardHeader>
+      <CardContent>
+      <ol className="list-decimal pl-5 space-y-2 text-sm text-muted-foreground">
         <li>
           <strong>Add Customer:</strong> Use the form on the left to add a new
           customer with name and contact.
         </li>
         <li>
           <strong>Create Invoice:</strong> Select a customer, enter date and
-          start/end time. The app auto-calculates duration and total cost at{' '}
+          start/end time. The app auto-calculates duration and total cost at the specified{' '}
           <em>rate per minute</em>.
         </li>
         <li>
-          <strong>Rounding:</strong> All amounts are rounded to the nearest whole number.
+          <strong>Rounding:</strong> All amounts are rounded to the nearest whole number for simplicity.
         </li>
         <li>
-          <strong>Payments:</strong> Enter <em>Amount Received</em> to track{' '}
-          <em>Amount Pending</em> = Total − Received.
+          <strong>Payments:</strong> Enter <em>Amount Received</em> when creating or editing an invoice to track the remaining{' '}
+          <em>Amount Pending</em>.
         </li>
         <li>
-          <strong>Manage:</strong> Edit/Delete any invoice. Edit/Delete
-          customers from the list.
+          <strong>Manage:</strong> Edit/Delete any invoice in real-time. Edit/Delete
+          customers from the list on the left.
         </li>
         <li>
-          <strong>History PDF:</strong> On a customer's page, click{' '}
-          <em>Download History PDF</em> for a complete record.
+          <strong>History PDF:</strong> Once a customer is selected, click{' '}
+          <em>Download PDF</em> for a complete, printable record of their invoices.
         </li>
         <li>
-          <strong>Settings:</strong> Change the rate, business name/contact/address. Export/Import settings via JSON.
+          <strong>Settings:</strong> Change the default rate, business name, contact, and address. Export/Import settings via JSON for backup or transfer.
         </li>
         <li>
           <strong>Print Invoice:</strong> Use the <em>Print</em> button on an
-          invoice row to get a clean, printable invoice format titled "Tubewell
-          Water Supply Invoice".
+          invoice row to get a clean, printable invoice format.
         </li>
       </ol>
+      </CardContent>
     </Card>
   );
 }
@@ -1152,9 +1234,9 @@ function CustomerDeleteDialog({ customer, onClose, onConfirm }) {
           <AlertDialogAction
             onClick={onConfirm}
             disabled={!isMatch}
-            className="bg-red-600 hover:bg-red-700"
+            asChild
           >
-            Delete
+            <Button variant="destructive">Delete Customer</Button>
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
