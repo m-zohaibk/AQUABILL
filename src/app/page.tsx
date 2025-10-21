@@ -108,9 +108,6 @@ function App() {
     [firestore, selectedCustomerId]
   );
   const { data: customerInvoices = [] } = useCollection(invoicesRef);
-  
-  const allInvoicesRef = useMemoFirebase(() => (firestore ? collection(firestore, 'invoices') : null), [firestore]);
-  const { data: allInvoices = [] } = useCollection(allInvoicesRef);
 
   const settingsRef = useMemoFirebase(
     () => (firestore ? doc(firestore, 'settings', 'default') : null),
@@ -123,7 +120,7 @@ function App() {
   const filteredCustomers = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return customers;
-    return customers.filter(
+    return (customers || []).filter(
       (c) =>
         c.name.toLowerCase().includes(q) ||
         (c.contact || '').toLowerCase().includes(q)
@@ -219,6 +216,7 @@ function App() {
 
   // Export Customer History PDF
   const exportCustomerHistoryPDF = (customer) => {
+    if (!customerInvoices) return;
     const doc = new jsPDF();
     const title = 'Tubewell Water Supply Invoice History';
     doc.setFontSize(16);
@@ -229,8 +227,7 @@ function App() {
     if (customer.contact) doc.text(`Contact: ${customer.contact}`, 14, 34);
     doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 40);
 
-    const rows = allInvoices
-      .filter((i) => i.customerId === customer.id)
+    const rows = customerInvoices
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .map((i) => {
         const mins = minutesBetween(i.startTime, i.endTime);
@@ -527,7 +524,7 @@ function InvoicesView({
               </tr>
             </thead>
             <tbody>
-              {customerInvoices.map((inv) => (
+              {(customerInvoices || []).map((inv) => (
                 <InvoiceRow
                   key={inv.id}
                   inv={inv}
@@ -536,7 +533,7 @@ function InvoicesView({
                   onDelete={onDeleteInvoice}
                 />
               ))}
-              {customerInvoices.length === 0 && (
+              {(!customerInvoices || customerInvoices.length === 0) && (
                 <tr>
                   <td colSpan={9} className="p-4 text-center text-gray-500">
                     No invoices yet.
@@ -578,7 +575,10 @@ function InvoiceForm({ settings, customerId, onSubmit }) {
           startTime,
           endTime,
           ratePerMinute,
+          durationMinutes: mins,
+          totalCost: total,
           amountReceived: Number(amountReceived) || 0,
+          amountPending: total - (Number(amountReceived) || 0),
         });
         setAmountReceived(0);
       }}
@@ -622,7 +622,7 @@ function InvoiceForm({ settings, customerId, onSubmit }) {
           type="number"
           step="0.01"
           value={amountReceived}
-          onChange={(e) => setAmountReceived(e.target.value)}
+          onChange={(e) => setAmountReceived(e.target.value as any)}
         />
       </div>
       <div className="flex flex-col justify-end">
