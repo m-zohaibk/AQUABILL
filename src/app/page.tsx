@@ -529,6 +529,9 @@ function DashboardView({ customers, firestore, settings }) {
           <p className="mt-1 text-3xl font-semibold text-red-600">
             {formatPKR(stats.totalPending)}
           </p>
+           <p className="text-xs text-gray-500">
+            (≈ {roundAbout(stats.totalPending)})
+          </p>
         </Card>
         <Card className="p-4">
           <h3 className="text-sm font-medium text-gray-500">Total Customers</h3>
@@ -865,7 +868,7 @@ function EditInvoiceForm({ inv, settings, onSave, onCancel }) {
     date: inv.date,
     startTime: inv.startTime,
     endTime: inv.endTime,
-    ratePerMinute: inv.ratePerMinute,
+    ratePerMinute: inv.ratePerMinute ?? settings.ratePerMinute,
     amountReceived: inv.amountReceived ?? 0,
   });
 
