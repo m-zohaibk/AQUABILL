@@ -867,7 +867,8 @@ function EditInvoiceForm({ inv, settings, onSave, onCancel }) {
   };
 
   const handleSave = () => {
-    const { date, startTime, endTime, ratePerMinute, amountReceived } = formData;
+    const { date, startTime, endTime, amountReceived } = formData;
+    const ratePerMinute = inv.ratePerMinute ?? settings.ratePerMinute; // Keep original rate
     const newMins = minutesBetween(startTime, endTime);
     if (isNaN(newMins)) {
         alert("Invalid time format.");
@@ -929,7 +930,7 @@ function EditInvoiceForm({ inv, settings, onSave, onCancel }) {
           </div>
           <div className="col-span-2">
             <Label>Rate per Minute (PKR)</Label>
-            <Input type="number" step="0.001" name="ratePerMinute" value={formData.ratePerMinute} onChange={handleChange} />
+            <Input type="number" step="0.001" name="ratePerMinute" value={formData.ratePerMinute} readOnly className="bg-gray-100" />
           </div>
            <div className="col-span-2">
             <Label>Amount Received (PKR)</Label>
