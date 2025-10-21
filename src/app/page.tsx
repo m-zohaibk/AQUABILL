@@ -15,6 +15,17 @@ import {
   FirebaseClientProvider,
 } from '@/firebase';
 import { collection, doc, getDocs } from 'firebase/firestore';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 // --- Simple UI primitives (Tailwind-only) to avoid external UI deps ---
 const Btn = ({ children, className = '', ...props }) => (
@@ -178,7 +189,6 @@ function App() {
 
   const deleteInvoice = (id) => {
     if (!firestore || !selectedCustomerId) return;
-    if (!confirm('Delete this invoice?')) return;
     const invoiceDoc = doc(firestore, 'customers', selectedCustomerId, 'invoices', id);
     deleteDocumentNonBlocking(invoiceDoc);
   };
@@ -774,6 +784,7 @@ function InvoiceForm({ settings, customerId, onSubmit }) {
 
 function InvoiceRow({ inv, settings, onUpdate, onDelete }) {
   const [isEditing, setIsEditing] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const printSingleInvoice = () => {
     const win = window.open('', '_blank');
@@ -823,6 +834,11 @@ function InvoiceRow({ inv, settings, onUpdate, onDelete }) {
     win.document.close();
   };
   
+  const handleDelete = () => {
+    onDelete(inv.id);
+    setIsDeleteDialogOpen(false);
+  };
+  
   if (isEditing) {
     return <EditInvoiceForm inv={inv} settings={settings} onSave={(updates) => { onUpdate(inv.id, updates); setIsEditing(false); }} onCancel={() => setIsEditing(false)} />;
   }
@@ -857,12 +873,27 @@ function InvoiceRow({ inv, settings, onUpdate, onDelete }) {
           >
             Edit
           </Btn>
-          <Btn
-            className="text-xs border-red-200 text-red-600"
-            onClick={() => onDelete(inv.id)}
-          >
-            Delete
-          </Btn>
+           <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+            <AlertDialogTrigger asChild>
+              <Btn
+                className="text-xs border-red-200 text-red-600"
+              >
+                Delete
+              </Btn>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action cannot be undone. This will permanently delete the invoice.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </td>
     </tr>
