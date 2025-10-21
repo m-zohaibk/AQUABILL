@@ -12,7 +12,7 @@ import {
   addDocumentNonBlocking,
   updateDocumentNonBlocking,
   deleteDocumentNonBlocking,
-  FirebaseClientProvider,
+  useUser,
 } from '@/firebase';
 import { collection, doc, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import {
@@ -45,8 +45,10 @@ import {
   BookUser,
   LayoutDashboard,
   HelpCircle,
-  Briefcase
+  Briefcase,
+  LogOut
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 
 // --- Helpers ---
@@ -79,42 +81,42 @@ const defaultSettings = {
   businessAddress: 'Your Area, Your City',
 };
 
-// --- Main App Entry ---
-export default function AppWrapper() {
-  return (
-    <FirebaseClientProvider>
-      <App />
-    </FirebaseClientProvider>
-  );
-}
-
 // --- Main App ---
-function App() {
-  const { firestore } = useFirebase();
+export default function App() {
+  const { firestore, auth } = useFirebase();
+  const { user, isUserLoading } = useUser();
+  const router = useRouter();
+
   const [search, setSearch] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
   const [view, setView] = useState('invoices'); // invoices | settings | about
   const [customerToDelete, setCustomerToDelete] = useState(null);
 
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.push('/login');
+    }
+  }, [user, isUserLoading, router]);
+
   // --- Firestore Data ---
   const customersRef = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'customers') : null),
-    [firestore]
+    () => (firestore && user ? collection(firestore, 'users', user.uid, 'customers') : null),
+    [firestore, user]
   );
   const { data: customers = [] } = useCollection(customersRef);
 
   const invoicesRef = useMemoFirebase(
     () =>
-      firestore && selectedCustomerId
-        ? collection(firestore, 'customers', selectedCustomerId, 'invoices')
+      firestore && user && selectedCustomerId
+        ? collection(firestore, 'users', user.uid, 'customers', selectedCustomerId, 'invoices')
         : null,
-    [firestore, selectedCustomerId]
+    [firestore, user, selectedCustomerId]
   );
   const { data: customerInvoices = [] } = useCollection(invoicesRef);
 
   const settingsRef = useMemoFirebase(
-    () => (firestore ? doc(firestore, 'settings', 'default') : null),
-    [firestore]
+    () => (firestore && user ? doc(firestore, 'users', user.uid, 'settings', 'default') : null),
+    [firestore, user]
   );
   const { data: settingsData } = useDoc(settingsRef);
   const settings = settingsData ? { ...defaultSettings, ...settingsData } : defaultSettings;
@@ -135,24 +137,23 @@ function App() {
 
   // Actions: Customers
   const addCustomer = (name, contact) => {
-    if (!firestore) return;
-    const customersCol = collection(firestore, 'customers');
-    addDocumentNonBlocking(customersCol, { name, contact }).then((docRef) => {
+    if (!customersRef) return;
+    addDocumentNonBlocking(customersRef, { name, contact }).then((docRef) => {
       if(docRef) setSelectedCustomerId(docRef.id);
     });
   };
 
   const updateCustomer = (id, updates) => {
-    if (!firestore) return;
-    const customerDoc = doc(firestore, 'customers', id);
+    if (!customersRef) return;
+    const customerDoc = doc(customersRef, id);
     updateDocumentNonBlocking(customerDoc, updates);
   };
 
   const deleteCustomer = (id) => {
-    if (!firestore) return;
+    if (!customersRef) return;
     // A more complex implementation (e.g., a cloud function) is needed to delete subcollections.
     // For now, we will just delete the customer document.
-    const customerDoc = doc(firestore, 'customers', id);
+    const customerDoc = doc(customersRef, id);
     deleteDocumentNonBlocking(customerDoc);
     if (selectedCustomerId === id) setSelectedCustomerId(null);
     setCustomerToDelete(null);
@@ -161,9 +162,8 @@ function App() {
 
   // Actions: Invoices
   const addInvoice = (payload) => {
-    if (!firestore || !selectedCustomerId) return;
-    const invoicesCol = collection(firestore, 'customers', selectedCustomerId, 'invoices');
-    addDocumentNonBlocking(invoicesCol, {
+    if (!invoicesRef) return;
+    addDocumentNonBlocking(invoicesRef, {
       ...payload,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -171,8 +171,8 @@ function App() {
   };
 
   const updateInvoice = (id, updates) => {
-    if (!firestore || !selectedCustomerId) return;
-    const invoiceDoc = doc(firestore, 'customers', selectedCustomerId, 'invoices', id);
+    if (!invoicesRef) return;
+    const invoiceDoc = doc(invoicesRef, id);
     updateDocumentNonBlocking(invoiceDoc, {
       ...updates,
       updatedAt: new Date().toISOString(),
@@ -180,15 +180,14 @@ function App() {
   };
 
   const deleteInvoice = (id) => {
-    if (!firestore || !selectedCustomerId) return;
-    const invoiceDoc = doc(firestore, 'customers', selectedCustomerId, 'invoices', id);
+    if (!invoicesRef) return;
+    const invoiceDoc = doc(invoicesRef, id);
     deleteDocumentNonBlocking(invoiceDoc);
   };
 
   const updateSettings = (newSettings) => {
-    if (!firestore) return;
-    const settingsDoc = doc(firestore, 'settings', 'default');
-    setDocumentNonBlocking(settingsDoc, newSettings, { merge: true });
+    if (!settingsRef) return;
+    setDocumentNonBlocking(settingsRef, newSettings, { merge: true });
   };
   
     // Export Settings JSON
@@ -273,6 +272,20 @@ function App() {
     setView('invoices');
   };
 
+  const handleSignOut = () => {
+    if(auth) {
+      auth.signOut();
+    }
+  }
+
+  if (isUserLoading || !user) {
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div>Loading...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <header className="sticky top-0 z-10 bg-white/80 dark:bg-gray-900/80 backdrop-blur border-b">
@@ -315,6 +328,15 @@ function App() {
             >
               <HelpCircle className="h-4 w-4" />
               Help
+            </Button>
+            <Button
+              variant='ghost'
+              size="sm"
+              onClick={handleSignOut}
+              className="inline-flex items-center gap-2"
+            >
+              <LogOut className="h-4 w-4" />
+              Sign Out
             </Button>
           </div>
         </div>
@@ -417,7 +439,7 @@ function App() {
           )}
           
           {view === 'invoices' && !selectedCustomer && (
-             <DashboardView customers={customers} firestore={firestore} settings={settings} />
+             <DashboardView customers={customers} firestore={firestore} settings={settings} user={user} />
           )}
 
 
@@ -489,7 +511,7 @@ function CustomerForm({ onSubmit }) {
 }
 
 // --- Dashboard View ---
-function DashboardView({ customers, firestore, settings }) {
+function DashboardView({ customers, firestore, settings, user }) {
   const [stats, setStats] = useState({
     totalReceived: 0,
     totalPending: 0,
@@ -501,7 +523,7 @@ function DashboardView({ customers, firestore, settings }) {
 
   useEffect(() => {
     async function fetchData() {
-      if (!firestore) {
+      if (!firestore || !user) {
         setIsLoading(false);
         return;
       }
@@ -511,7 +533,7 @@ function DashboardView({ customers, firestore, settings }) {
       // Fetch all invoices for stats
       let allInvoices = [];
       for (const customer of (customers || [])) {
-        const invoicesColRef = collection(firestore, 'customers', customer.id, 'invoices');
+        const invoicesColRef = collection(firestore, 'users', user.uid, 'customers', customer.id, 'invoices');
         const querySnapshot = await getDocs(invoicesColRef);
         querySnapshot.forEach((doc) => {
           allInvoices.push({ ...doc.data(), customerName: customer.name });
@@ -536,7 +558,7 @@ function DashboardView({ customers, firestore, settings }) {
     }
 
     fetchData();
-  }, [customers, firestore]);
+  }, [customers, firestore, user]);
 
   if (isLoading) {
     return (
