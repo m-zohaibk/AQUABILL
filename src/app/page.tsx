@@ -14,7 +14,7 @@ import {
   deleteDocumentNonBlocking,
   FirebaseClientProvider,
 } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
+import { collection, doc, getDocs } from 'firebase/firestore';
 
 // --- Simple UI primitives (Tailwind-only) to avoid external UI deps ---
 const Btn = ({ children, className = '', ...props }) => (
@@ -230,8 +230,8 @@ function App() {
     const rows = customerInvoices
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .map((i) => {
-        const mins = minutesBetween(i.startTime, i.endTime);
-        const total = mins * (i.ratePerMinute ?? settings.ratePerMinute);
+        const mins = i.durationMinutes;
+        const total = i.totalCost;
         const rounded = roundAbout(total);
         return [
           i.date,
@@ -241,7 +241,7 @@ function App() {
           total.toFixed(2),
           `~${rounded}`,
           (i.amountReceived ?? 0).toFixed(2),
-          (total - (i.amountReceived ?? 0)).toFixed(2),
+          i.amountPending.toFixed(2),
         ];
       });
 
@@ -267,6 +267,11 @@ function App() {
 
     doc.save(`${customer.name.replace(/\s+/g, '_')}_invoice_history.pdf`);
   };
+  
+  const handleViewAllCustomers = () => {
+    setSelectedCustomerId(null);
+    setView('invoices');
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-white">
@@ -286,13 +291,13 @@ function App() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Btn
+           <Btn
               className={`hidden sm:inline-flex ${
-                view === 'invoices' ? 'bg-indigo-600 text-white' : ''
+                !selectedCustomerId && view === 'invoices' ? 'bg-indigo-600 text-white' : ''
               }`}
-              onClick={() => setView('invoices')}
+              onClick={handleViewAllCustomers}
             >
-              Invoices
+              Dashboard
             </Btn>
             <Btn
               className={`${
@@ -336,7 +341,10 @@ function App() {
                 >
                   <button
                     className="text-left flex-1"
-                    onClick={() => setSelectedCustomerId(c.id)}
+                    onClick={() => {
+                      setSelectedCustomerId(c.id);
+                      setView('invoices');
+                    }}
                   >
                     <div className="font-medium">{c.name}</div>
                     <div className="text-xs text-gray-500">
@@ -380,7 +388,7 @@ function App() {
 
         {/* Main Content */}
         <section>
-          {view === 'invoices' && (
+          {view === 'invoices' && selectedCustomer && (
             <InvoicesView
               settings={settings}
               selectedCustomer={selectedCustomer}
@@ -393,6 +401,11 @@ function App() {
               }
             />
           )}
+          
+          {view === 'invoices' && !selectedCustomer && (
+             <DashboardView customers={customers} firestore={firestore} settings={settings} />
+          )}
+
 
           {view === 'settings' && (
             <SettingsView
@@ -450,6 +463,93 @@ function CustomerForm({ onSubmit }) {
     </form>
   );
 }
+
+// --- Dashboard View ---
+function DashboardView({ customers, firestore, settings }) {
+  const [stats, setStats] = useState({
+    totalReceived: 0,
+    totalPending: 0,
+    totalCustomers: 0,
+    totalInvoices: 0,
+  });
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchAllInvoices() {
+      if (!firestore || !customers || customers.length === 0) {
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      let allInvoices = [];
+      for (const customer of customers) {
+        const invoicesColRef = collection(firestore, 'customers', customer.id, 'invoices');
+        const querySnapshot = await getDocs(invoicesColRef);
+        querySnapshot.forEach((doc) => {
+          allInvoices.push(doc.data());
+        });
+      }
+      
+      const totalReceived = allInvoices.reduce((sum, inv) => sum + (inv.amountReceived || 0), 0);
+      const totalPending = allInvoices.reduce((sum, inv) => sum + (inv.amountPending || 0), 0);
+      
+      setStats({
+        totalReceived,
+        totalPending,
+        totalCustomers: customers.length,
+        totalInvoices: allInvoices.length,
+      });
+      setIsLoading(false);
+    }
+
+    fetchAllInvoices();
+  }, [customers, firestore]);
+
+  if (isLoading) {
+    return (
+      <Card className="p-6 text-center">
+        <p>Loading dashboard...</p>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+       <Card className="p-6">
+        <SectionTitle>Business Dashboard</SectionTitle>
+         <p className="text-sm text-gray-500 mt-1">An overview of your business performance.</p>
+       </Card>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="p-4">
+          <h3 className="text-sm font-medium text-gray-500">Total Amount Received</h3>
+          <p className="mt-1 text-3xl font-semibold text-emerald-600">{formatPKR(stats.totalReceived)}</p>
+        </Card>
+        <Card className="p-4">
+          <h3 className="text-sm font-medium text-gray-500">Total Amount Pending</h3>
+          <p className="mt-1 text-3xl font-semibold text-red-600">{formatPKR(stats.totalPending)}</p>
+        </Card>
+        <Card className="p-4">
+          <h3 className="text-sm font-medium text-gray-500">Total Customers</h3>
+          <p className="mt-1 text-3xl font-semibold">{stats.totalCustomers}</p>
+        </Card>
+        <Card className="p-4">
+          <h3 className="text-sm font-medium text-gray-500">Total Invoices</h3>
+          <p className="mt-1 text-3xl font-semibold">{stats.totalInvoices}</p>
+        </Card>
+      </div>
+      <Card className="p-6 grid place-content-center min-h-[40vh] text-center">
+        <div>
+          <h3 className="text-xl font-semibold">Select a customer</h3>
+          <p className="text-sm text-gray-500 mt-2">
+            Choose a customer from the left to view and create their invoices.
+          </p>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 
 // --- Invoices View ---
 function InvoicesView({
@@ -641,10 +741,10 @@ function InvoiceForm({ settings, customerId, onSubmit }) {
 }
 
 function InvoiceRow({ inv, settings, onUpdate, onDelete }) {
-  const mins = minutesBetween(inv.startTime, inv.endTime);
-  const total = mins * (inv.ratePerMinute ?? settings.ratePerMinute);
+  const mins = inv.durationMinutes;
+  const total = inv.totalCost;
   const rounded = roundAbout(total);
-  const pending = total - (inv.amountReceived ?? 0);
+  const pending = inv.amountPending;
 
   const printSingleInvoice = () => {
     const win = window.open('', '_blank');
@@ -699,6 +799,44 @@ function InvoiceRow({ inv, settings, onUpdate, onDelete }) {
     win.document.write(html);
     win.document.close();
   };
+  
+  const handleEdit = () => {
+      const date = prompt('Date (YYYY-MM-DD)', inv.date) || inv.date;
+      const startTime = prompt('Start Time (HH:MM)', inv.startTime) || inv.startTime;
+      const endTime = prompt('End Time (HH:MM)', inv.endTime) || inv.endTime;
+      
+      const newMins = minutesBetween(startTime, endTime);
+      
+      const ratePerMinute = Number(
+        prompt(
+          'Rate per minute',
+          inv.ratePerMinute ?? settings.ratePerMinute
+        ) ??
+          inv.ratePerMinute ??
+          settings.ratePerMinute
+      );
+
+      const newTotal = newMins * ratePerMinute;
+      
+      const amountReceived = Number(
+        prompt('Amount received', inv.amountReceived ?? 0) ??
+          inv.amountReceived ??
+          0
+      );
+      
+      const newPending = newTotal - amountReceived;
+
+      onUpdate(inv.id, {
+        date,
+        startTime,
+        endTime,
+        ratePerMinute,
+        amountReceived,
+        durationMinutes: newMins,
+        totalCost: newTotal,
+        amountPending: newPending,
+      });
+  };
 
   return (
     <tr className="border-b">
@@ -727,33 +865,7 @@ function InvoiceRow({ inv, settings, onUpdate, onDelete }) {
           </Btn>
           <Btn
             className="text-xs"
-            onClick={() => {
-              const date = prompt('Date (YYYY-MM-DD)', inv.date) || inv.date;
-              const startTime =
-                prompt('Start Time (HH:MM)', inv.startTime) || inv.startTime;
-              const endTime =
-                prompt('End Time (HH:MM)', inv.endTime) || inv.endTime;
-              const ratePerMinute = Number(
-                prompt(
-                  'Rate per minute',
-                  inv.ratePerMinute ?? settings.ratePerMinute
-                ) ||
-                  inv.ratePerMinute ||
-                  settings.ratePerMinute
-              );
-              const amountReceived = Number(
-                prompt('Amount received', inv.amountReceived ?? 0) ||
-                  inv.amountReceived ||
-                  0
-              );
-              onUpdate(inv.id, {
-                date,
-                startTime,
-                endTime,
-                ratePerMinute,
-                amountReceived,
-              });
-            }}
+            onClick={handleEdit}
           >
             Edit
           </Btn>
