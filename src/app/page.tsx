@@ -131,7 +131,7 @@ function App() {
   }, [customers, search]);
 
   const selectedCustomer =
-    customers.find((c) => c.id === selectedCustomerId) || null;
+    (customers || []).find((c) => c.id === selectedCustomerId) || null;
 
   // Actions: Customers
   const addCustomer = (name, contact) => {
@@ -328,7 +328,7 @@ function App() {
               />
             </div>
             <div className="mt-3 space-y-2 max-h-[52vh] overflow-auto pr-1">
-              {filteredCustomers.map((c) => (
+              {(filteredCustomers || []).map((c) => (
                 <div
                   key={c.id}
                   className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${
@@ -367,7 +367,7 @@ function App() {
                   </div>
                 </div>
               ))}
-              {filteredCustomers.length === 0 && (
+              {filteredCustomers && filteredCustomers.length === 0 && (
                 <p className="text-sm text-gray-500 py-4 text-center">
                   No customers found.
                 </p>
