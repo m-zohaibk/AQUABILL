@@ -1,0 +1,190 @@
+{
+  "entities": {
+    "Customer": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Customer",
+      "type": "object",
+      "description": "Represents a customer using the AquaBill service.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the customer entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The full name of the customer."
+        },
+        "contactDetails": {
+          "type": "string",
+          "description": "Contact information for the customer (e.g., phone number, email address)."
+        },
+        "address": {
+          "type": "string",
+          "description": "The address of the customer."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "contactDetails"
+      ]
+    },
+    "Invoice": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Invoice",
+      "type": "object",
+      "description": "Represents an invoice for water supply to a customer.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the invoice entity."
+        },
+        "customerId": {
+          "type": "string",
+          "description": "Reference to Customer. (Relationship: Customer 1:N Invoice)"
+        },
+        "date": {
+          "type": "string",
+          "description": "The date the invoice was issued.",
+          "format": "date-time"
+        },
+        "startTime": {
+          "type": "string",
+          "description": "The start time of the water supply period.",
+          "format": "date-time"
+        },
+        "endTime": {
+          "type": "string",
+          "description": "The end time of the water supply period.",
+          "format": "date-time"
+        },
+        "ratePerMinute": {
+          "type": "number",
+          "description": "The rate charged per minute of water supply."
+        },
+        "durationMinutes": {
+          "type": "number",
+          "description": "The calculated duration in minutes of the water supply."
+        },
+        "totalCost": {
+          "type": "number",
+          "description": "The calculated total cost of the water supply."
+        },
+        "amountReceived": {
+          "type": "number",
+          "description": "The amount of payment received for the invoice."
+        },
+        "amountPending": {
+          "type": "number",
+          "description": "The amount of payment pending for the invoice."
+        }
+      },
+      "required": [
+        "id",
+        "customerId",
+        "date",
+        "startTime",
+        "endTime",
+        "ratePerMinute",
+        "durationMinutes",
+        "totalCost",
+        "amountReceived",
+        "amountPending"
+      ]
+    },
+    "Setting": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Setting",
+      "type": "object",
+      "description": "Represents application settings.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the setting entity."
+        },
+        "ratePerMinute": {
+          "type": "number",
+          "description": "The default rate per minute for water supply."
+        },
+        "businessName": {
+          "type": "string",
+          "description": "The name of the business providing the water supply service."
+        },
+        "contactInformation": {
+          "type": "string",
+          "description": "Contact information for the business (e.g., phone number, email address)."
+        },
+        "address": {
+          "type": "string",
+          "description": "The address of the business."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/customers/{customerId}",
+        "definition": {
+          "entityName": "Customer",
+          "schema": {
+            "$ref": "#/backend/entities/Customer"
+          },
+          "description": "Stores customer data.  Unrestricted access for all users.",
+          "params": [
+            {
+              "name": "customerId",
+              "description": "Unique identifier for the customer."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/customers/{customerId}/invoices/{invoiceId}",
+        "definition": {
+          "entityName": "Invoice",
+          "schema": {
+            "$ref": "#/backend/entities/Invoice"
+          },
+          "description": "Stores invoices associated with a specific customer. Unrestricted access for all users.",
+          "params": [
+            {
+              "name": "customerId",
+              "description": "Unique identifier for the customer."
+            },
+            {
+              "name": "invoiceId",
+              "description": "Unique identifier for the invoice."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/settings/{settingId}",
+        "definition": {
+          "entityName": "Setting",
+          "schema": {
+            "$ref": "#/backend/entities/Setting"
+          },
+          "description": "Stores application settings. Only one setting document is expected. Unrestricted access for all users.",
+          "params": [
+            {
+              "name": "settingId",
+              "description": "Unique identifier for the setting (e.g., 'default')."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "Given the requirement to allow all permissions to every user, the Firestore structure is simplified. Since there are no access restrictions, we can focus on organizing the data for efficient querying and management, rather than complex security rules. The structure is designed to optimize for the UI features: Customer Management, Invoice Generation & Tracking, Settings Management, and Reporting. The use of subcollections is appropriate for the one-to-many relationship between Customers and Invoices. No denormalization is required as there are no security rules to enforce. QAPs are trivially supported because there are no list restrictions."
+  }
+}
