@@ -17,7 +17,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${quicksand.variable}`}>
+    <html lang="en" className={`${quicksand.variable}`} suppressHydrationWarning>
       <body className="font-sans antialiased">
         <FirebaseClientProvider>
           {children}
