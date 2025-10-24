@@ -26,6 +26,16 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog"
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -91,6 +101,7 @@ export default function App() {
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
   const [view, setView] = useState('invoices'); // invoices | settings | about
   const [customerToDelete, setCustomerToDelete] = useState(null);
+  const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -140,6 +151,7 @@ export default function App() {
     if (!customersRef) return;
     addDocumentNonBlocking(customersRef, { name, contact }).then((docRef) => {
       if(docRef) setSelectedCustomerId(docRef.id);
+      setIsAddCustomerOpen(false);
     });
   };
 
@@ -349,8 +361,25 @@ export default function App() {
         {/* Sidebar */}
         <aside className="space-y-6">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5" /> Customers</CardTitle>
+              <Dialog open={isAddCustomerOpen} onOpenChange={setIsAddCustomerOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm">
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    New Customer
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px]">
+                  <DialogHeader>
+                    <DialogTitle>Add New Customer</DialogTitle>
+                    <DialogDescription>
+                      Enter the details for the new customer below.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <CustomerForm onSubmit={addCustomer} />
+                </DialogContent>
+              </Dialog>
             </CardHeader>
             <CardContent>
               <Input
@@ -412,17 +441,6 @@ export default function App() {
               </div>
             </CardContent>
           </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <PlusCircle className="h-5 w-5" /> Add Customer
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <CustomerForm onSubmit={addCustomer} />
-            </CardContent>
-          </Card>
         </aside>
 
         {/* Main Content */}
@@ -478,37 +496,47 @@ export default function App() {
 function CustomerForm({ onSubmit }) {
   const [name, setName] = useState('');
   const [contact, setContact] = useState('');
+  
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return alert('Enter customer name');
+    onSubmit(name.trim(), contact.trim());
+    setName('');
+    setContact('');
+  };
+
   return (
     <form
-      className="grid grid-cols-1 gap-4"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!name.trim()) return alert('Enter customer name');
-        onSubmit(name.trim(), contact.trim());
-        setName('');
-        setContact('');
-      }}
+      className="grid grid-cols-1 gap-4 py-4"
+      onSubmit={handleSubmit}
     >
       <div className="space-y-2">
-        <Label>Customer Name</Label>
+        <Label htmlFor="name">Customer Name</Label>
         <Input
+          id="name"
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g., Ali Khan"
         />
       </div>
       <div className="space-y-2">
-        <Label>Contact Number</Label>
+        <Label htmlFor="contact">Contact Number</Label>
         <Input
+          id="contact"
           value={contact}
           onChange={(e) => setContact(e.target.value)}
           placeholder="03XX-XXXXXXX"
         />
       </div>
-      <Button type="submit" className="w-full">
-        <PlusCircle className="mr-2 h-4 w-4" />
-        Add Customer
-      </Button>
+      <DialogFooter>
+        <DialogClose asChild>
+           <Button type="button" variant="ghost">Cancel</Button>
+        </DialogClose>
+        <Button type="submit">
+          <PlusCircle className="mr-2 h-4 w-4" />
+          Add Customer
+        </Button>
+      </DialogFooter>
     </form>
   );
 }
