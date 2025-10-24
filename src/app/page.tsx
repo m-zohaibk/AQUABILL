@@ -280,8 +280,11 @@ export default function App() {
 
   if (isUserLoading || !user) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-gray-50 dark:bg-gray-900">
-        <div>Loading...</div>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
+        <div className="flex items-center gap-4 animate-pulse">
+          <Briefcase className="h-12 w-12 text-primary" />
+          <span className="text-2xl font-semibold text-gray-700 dark:text-gray-300">Loading AquaBill...</span>
+        </div>
       </div>
     );
   }

@@ -9,6 +9,18 @@ import { useFirebase, useUser } from '@/firebase';
 import { initiateEmailSignUp } from '@/firebase/non-blocking-login';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Briefcase } from 'lucide-react';
+
+function LoadingSpinner() {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
+      <div className="flex items-center gap-4 animate-pulse">
+        <Briefcase className="h-12 w-12 text-primary" />
+        <span className="text-2xl font-semibold text-gray-700 dark:text-gray-300">Loading AquaBill...</span>
+      </div>
+    </div>
+  );
+}
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('');
@@ -48,7 +60,7 @@ export default function RegisterPage() {
   };
 
   if (isUserLoading || user) {
-    return <div>Loading...</div>;
+    return <LoadingSpinner />;
   }
 
   return (
