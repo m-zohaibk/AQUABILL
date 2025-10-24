@@ -1,91 +1,92 @@
 /**
- * @fileoverview Firestore Security Rules for Water Supply App.
- *
- * Core Philosophy:
- * This ruleset enforces a strict user-ownership model where each user has exclusive
- * access to their own data, stored under their unique user ID.
+ * @file Firestore Security Rules
+ * @description This ruleset enforces a strict user-ownership model, where each user can only access data nested under their own user ID.
  *
  * Data Structure:
- * All data (customers, invoices, settings) is nested under the /users/{userId} path.
- * This structure simplifies the security rules and ensures data isolation.
+ * All data is nested under /users/{userId}, with subcollections for customers, invoices, and settings. This structure ensures data isolation between users.
  *
  * Key Security Decisions:
- * - User listing is disallowed to protect user privacy.
- * - All write operations are restricted to the owner of the data, based on the path.
- * - The rules do not enforce a specific schema, but they do enforce that the
- *   userId in the path matches the authenticated user's UID for data consistency,
- *   especially on create operations.
- * - No denormalization of data is needed as only the user themselves can access the data.
+ * - User listing is implicitly disallowed by the data structure and rules.
+ * - The default security posture is strict: any access not explicitly allowed is denied.
+ * - Authorization relies solely on the authenticated user's UID matching the {userId} path segment.
+ *
+ *  Denormalization for Authorization: NOT REQUIRED - The data structure ensures that authorization data is not denormalized.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to customer documents. Only the owner can read, create, update, or delete.
+     * @description Controls access to customer documents under a user's profile.
      * @path /users/{userId}/customers/{customerId}
-     * @allow (create) - User 'abc' creates a new customer document under /users/abc/customers/123.
-     * @allow (get) - User 'abc' reads a customer document under /users/abc/customers/123.
-     * @allow (update) - User 'abc' updates a customer document under /users/abc/customers/123.
-     * @allow (delete) - User 'abc' deletes a customer document under /users/abc/customers/123.
-     * @deny (create) - User 'def' attempts to create a customer document under /users/abc/customers/123.
-     * @deny (get) - User 'def' attempts to read a customer document under /users/abc/customers/123.
-     * @deny (update) - User 'def' attempts to update a customer document under /users/abc/customers/123.
-     * @deny (delete) - User 'def' attempts to delete a customer document under /users/abc/customers/123.
-     * @principle Enforces document ownership for all operations.
+     * @allow (create) User 'tVROdyxhaOWAh9tfCUQW7qqO7O13' can create a customer document if their UID matches the {userId} path.
+     * @deny (create) User 'anotherUserId' cannot create a customer document under '/users/tVROdyxhaOWAh9tfCUQW7qqO7O13/customers'
+     * @allow (get) User 'tVROdyxhaOWAh9tfCUQW7qqO7O13' can get a customer document if their UID matches the {userId} path.
+     * @deny (get) User 'anotherUserId' cannot get a customer document under '/users/tVROdyxhaOWAh9tfCUQW7qqO7O13/customers'
+     * @allow (list) User 'tVROdyxhaOWAh9tfCUQW7qqO7O13' can list customer documents if their UID matches the {userId} path.
+     * @deny (list) User 'anotherUserId' cannot list customer documents under '/users/tVROdyxhaOWAh9tfCUQW7qqO7O13/customers'
+     * @allow (update) User 'tVROdyxhaOWAh9tfCUQW7qqO7O13' can update a customer document if their UID matches the {userId} path.
+     * @deny (update) User 'anotherUserId' cannot update a customer document under '/users/tVROdyxhaOWAh9tfCUQW7qqO7O13/customers'
+     * @allow (delete) User 'tVROdyxhaOWAh9tfCUQW7qqO7O13' can delete a customer document if their UID matches the {userId} path.
+     * @deny (delete) User 'anotherUserId' cannot delete a customer document under '/users/tVROdyxhaOWAh9tfCUQW7qqO7O13/customers'
+     * @principle Enforces document ownership based on the user ID in the path.
      */
     match /users/{userId}/customers/{customerId} {
       allow get: if isSignedIn() && isOwner(userId);
       allow list: if isSignedIn() && isOwner(userId);
-      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == customerId;
-      allow update: if isSignedIn() && isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && isExistingOwner(userId);
       allow delete: if isSignedIn() && isExistingOwner(userId);
     }
 
     /**
-     * @description Controls access to invoice documents. Only the owner can read, create, update, or delete.
+     * @description Controls access to invoice documents under a user's profile.
      * @path /users/{userId}/invoices/{invoiceId}
-     * @allow (create) - User 'abc' creates a new invoice document under /users/abc/invoices/456.
-     * @allow (get) - User 'abc' reads an invoice document under /users/abc/invoices/456.
-     * @allow (update) - User 'abc' updates an invoice document under /users/abc/invoices/456.
-     * @allow (delete) - User 'abc' deletes an invoice document under /users/abc/invoices/456.
-     * @deny (create) - User 'def' attempts to create an invoice document under /users/abc/invoices/456.
-     * @deny (get) - User 'def' attempts to read an invoice document under /users/abc/invoices/456.
-     * @deny (update) - User 'def' attempts to update an invoice document under /users/abc/invoices/456.
-     * @deny (delete) - User 'def' attempts to delete an invoice document under /users/abc/invoices/456.
-     * @principle Enforces document ownership for all operations.
+     * @allow (create) User 'tVROdyxhaOWAh9tfCUQW7qqO7O13' can create an invoice document if their UID matches the {userId} path.
+     * @deny (create) User 'anotherUserId' cannot create an invoice document under '/users/tVROdyxhaOWAh9tfCUQW7qqO7O13/invoices'
+     * @allow (get) User 'tVROdyxhaOWAh9tfCUQW7qqO7O13' can get an invoice document if their UID matches the {userId} path.
+     * @deny (get) User 'anotherUserId' cannot get an invoice document under '/users/tVROdyxhaOWAh9tfCUQW7qqO7O13/invoices'
+     * @allow (list) User 'tVROdyxhaOWAh9tfCUQW7qqO7O13' can list invoice documents if their UID matches the {userId} path.
+     * @deny (list) User 'anotherUserId' cannot list invoice documents under '/users/tVROdyxhaOWAh9tfCUQW7qqO7O13/invoices'
+     * @allow (update) User 'tVROdyxhaOWAh9tfCUQW7qqO7O13' can update an invoice document if their UID matches the {userId} path.
+     * @deny (update) User 'anotherUserId' cannot update an invoice document under '/users/tVROdyxhaOWAh9tfCUQW7qqO7O13/invoices'
+     * @allow (delete) User 'tVROdyxhaOWAh9tfCUQW7qqO7O13' can delete an invoice document if their UID matches the {userId} path.
+     * @deny (delete) User 'anotherUserId' cannot delete an invoice document under '/users/tVROdyxhaOWAh9tfCUQW7qqO7O13/invoices'
+     * @principle Enforces document ownership based on the user ID in the path.
      */
     match /users/{userId}/invoices/{invoiceId} {
       allow get: if isSignedIn() && isOwner(userId);
       allow list: if isSignedIn() && isOwner(userId);
-      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == invoiceId;
-      allow update: if isSignedIn() && isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && isExistingOwner(userId);
       allow delete: if isSignedIn() && isExistingOwner(userId);
     }
 
     /**
-     * @description Controls access to settings documents. Only the owner can read, create, update, or delete.
+     * @description Controls access to settings documents under a user's profile.
      * @path /users/{userId}/settings/{settingId}
-     * @allow (create) - User 'abc' creates a new settings document under /users/abc/settings/789.
-     * @allow (get) - User 'abc' reads a settings document under /users/abc/settings/789.
-     * @allow (update) - User 'abc' updates a settings document under /users/abc/settings/789.
-     * @allow (delete) - User 'abc' deletes a settings document under /users/abc/settings/789.
-     * @deny (create) - User 'def' attempts to create a settings document under /users/abc/settings/789.
-     * @deny (get) - User 'def' attempts to read a settings document under /users/abc/settings/789.
-     * @deny (update) - User 'def' attempts to update a settings document under /users/abc/settings/789.
-     * @deny (delete) - User 'def' attempts to delete a settings document under /users/abc/settings/789.
-     * @principle Enforces document ownership for all operations.
+     * @allow (create) User 'tVROdyxhaOWAh9tfCUQW7qqO7O13' can create a settings document if their UID matches the {userId} path.
+     * @deny (create) User 'anotherUserId' cannot create a settings document under '/users/tVROdyxhaOWAh9tfCUQW7qqO7O13/settings'
+     * @allow (get) User 'tVROdyxhaOWAh9tfCUQW7qqO7O13' can get a settings document if their UID matches the {userId} path.
+     * @deny (get) User 'anotherUserId' cannot get a settings document under '/users/tVROdyxhaOWAh9tfCUQW7qqO7O13/settings'
+     * @allow (list) User 'tVROdyxhaOWAh9tfCUQW7qqO7O13' can list settings documents if their UID matches the {userId} path.
+     * @deny (list) User 'anotherUserId' cannot list settings documents under '/users/tVROdyxhaOWAh9tfCUQW7qqO7O13/settings'
+     * @allow (update) User 'tVROdyxhaOWAh9tfCUQW7qqO7O13' can update a settings document if their UID matches the {userId} path.
+     * @deny (update) User 'anotherUserId' cannot update a settings document under '/users/tVROdyxhaOWAh9tfCUQW7qqO7O13/settings'
+     * @allow (delete) User 'tVROdyxhaOWAh9tfCUQW7qqO7O13' can delete a settings document if their UID matches the {userId} path.
+     * @deny (delete) User 'anotherUserId' cannot delete a settings document under '/users/tVROdyxhaOWAh9tfCUQW7qqO7O13/settings'
+     * @principle Enforces document ownership based on the user ID in the path.
      */
     match /users/{userId}/settings/{settingId} {
       allow get: if isSignedIn() && isOwner(userId);
       allow list: if isSignedIn() && isOwner(userId);
-      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == settingId;
-      allow update: if isSignedIn() && isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && isExistingOwner(userId);
       allow delete: if isSignedIn() && isExistingOwner(userId);
     }
   }
 
-  // Helper Functions
+  // Helper functions
   function isSignedIn() {
     return request.auth != null;
   }
