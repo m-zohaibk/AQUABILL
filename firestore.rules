@@ -2,129 +2,127 @@
  * @fileoverview Firestore Security Rules for Water Supply App.
  *
  * Core Philosophy:
- * This ruleset enforces a strict user-ownership model. Each user has a dedicated data tree under `/users/{userId}`.
- * Only the authenticated user matching the `userId` can read and write data within their respective tree.
+ * This ruleset enforces a strict user-ownership model where each user has complete control over their own data and cannot access data belonging to other users.
  *
  * Data Structure:
- * All data (customers, invoices, settings) is nested under `/users/{userId}`. This structure simplifies
- * authorization by aligning data access directly with user identity.
+ * All data (customers, invoices, settings) is nested under the `/users/{userId}` path. This ensures that each user's data is isolated from other users.
  *
  * Key Security Decisions:
- * - User listing is implicitly disallowed by the path-based ownership model.
- * - There are no global admin roles. Each user has full control over their own data.
- * - Data validation is relaxed to allow rapid prototyping but includes checks on relational integrity where appropriate.
- * - No data denormalization is required as the path based ownership is enough to write secure and performant rules.
+ * - User listing is implicitly disallowed as there are no rules governing the `/users` collection itself.
+ * - The rules strictly enforce path-based ownership, meaning the `userId` in the path must always match the authenticated user's UID.
+ * - No data validation beyond ownership is enforced in this initial prototyping phase to allow for schema flexibility.
+ * - Since the application uses path-based ownership and does not have complex role-based access control, no denormalization is needed.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to customer documents for a specific user.
+     * @description Controls access to customer data for individual users.
      * @path /users/{userId}/customers/{customerId}
-     * @allow (create) - User 'user_abc' can create a new customer document with ID matching 'user_abc' when authenticated as 'user_abc'.
-     * @allow (update) - User 'user_abc' can update an existing customer document when authenticated as 'user_abc'.
-     * @allow (delete) - User 'user_abc' can delete an existing customer document when authenticated as 'user_abc'.
-     * @allow (get) - User 'user_abc' can get their own customer documents when authenticated as 'user_abc'.
-     * @allow (list) - User 'user_abc' can list their own customer documents when authenticated as 'user_abc'.
-     * @deny (create) - User 'user_xyz' cannot create a new customer document under /users/user_abc/ if authenticated as 'user_xyz'.
-     * @deny (update) - User 'user_xyz' cannot update a customer document under /users/user_abc/ if authenticated as 'user_xyz'.
-     * @deny (delete) - User 'user_xyz' cannot delete a customer document under /users/user_abc/ if authenticated as 'user_xyz'.
+     * @allow (create) - A user can create a new customer document under their own user ID.
+     * @deny (create) - A user cannot create a customer document under another user's ID.
+     * @allow (get, list, update, delete) - A user can only access customer data associated with their own user ID.
+     * @deny (get, list, update, delete) - A user cannot access or modify customer data associated with another user's ID.
      * @principle Enforces document ownership for writes and restricts access to a user's own data tree.
      */
     match /users/{userId}/customers/{customerId} {
-      // Helper function to check if the user is signed in
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      // Helper function to check if the authenticated user is the owner of the document
+      // Helper function to check if the authenticated user is the owner of the document.
       function isOwner(userId) {
         return request.auth.uid == userId;
       }
 
-      // Helper function to check if the authenticated user is the owner of the existing document
+      // Helper function to check if the authenticated user is the owner of the EXISTING document.
       function isExistingOwner(userId) {
         return isOwner(userId) && resource != null;
       }
 
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if isSignedIn() && isOwner(userId);
-      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == customerId;
-      allow update: if isSignedIn() && isExistingOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if isSignedIn() && isExistingOwner(userId);
+      // Allow a user to create a new customer document under their own user ID.
+      allow create: if isOwner(userId);
+
+      // Allow the user to get their own customer documents.
+      allow get: if isOwner(userId);
+
+      // Allow the user to list their own customer documents.
+      allow list: if isOwner(userId);
+
+      // Allow the user to update their own customer documents, but only if the document exists.
+      allow update: if isExistingOwner(userId);
+
+      // Allow the user to delete their own customer documents, but only if the document exists.
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Controls access to invoice documents for a specific user.
+     * @description Controls access to invoice data for individual users.
      * @path /users/{userId}/invoices/{invoiceId}
-     * @allow (create) - User 'user_abc' can create a new invoice document with ID matching 'invoice_123' when authenticated as 'user_abc'.
-     * @allow (update) - User 'user_abc' can update an existing invoice document when authenticated as 'user_abc'.
-     * @allow (delete) - User 'user_abc' can delete an existing invoice document when authenticated as 'user_abc'.
-     * @allow (get) - User 'user_abc' can get their own invoice documents when authenticated as 'user_abc'.
-     * @allow (list) - User 'user_abc' can list their own invoice documents when authenticated as 'user_abc'.
-     * @deny (create) - User 'user_xyz' cannot create a new invoice document under /users/user_abc/ if authenticated as 'user_xyz'.
-     * @deny (update) - User 'user_xyz' cannot update an invoice document under /users/user_abc/ if authenticated as 'user_xyz'.
-     * @deny (delete) - User 'user_xyz' cannot delete an invoice document under /users/user_abc/ if authenticated as 'user_xyz'.
+     * @allow (create) - A user can create a new invoice document under their own user ID.
+     * @deny (create) - A user cannot create an invoice document under another user's ID.
+     * @allow (get, list, update, delete) - A user can only access invoice data associated with their own user ID.
+     * @deny (get, list, update, delete) - A user cannot access or modify invoice data associated with another user's ID.
      * @principle Enforces document ownership for writes and restricts access to a user's own data tree.
      */
     match /users/{userId}/invoices/{invoiceId} {
-      // Helper function to check if the user is signed in
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      // Helper function to check if the authenticated user is the owner of the document
+       // Helper function to check if the authenticated user is the owner of the document.
       function isOwner(userId) {
         return request.auth.uid == userId;
       }
 
-      // Helper function to check if the authenticated user is the owner of the existing document
+      // Helper function to check if the authenticated user is the owner of the EXISTING document.
       function isExistingOwner(userId) {
         return isOwner(userId) && resource != null;
       }
 
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if isSignedIn() && isOwner(userId);
-      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == invoiceId;
-      allow update: if isSignedIn() && isExistingOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if isSignedIn() && isExistingOwner(userId);
+      // Allow a user to create a new invoice document under their own user ID.
+      allow create: if isOwner(userId);
+
+      // Allow the user to get their own invoice documents.
+      allow get: if isOwner(userId);
+
+      // Allow the user to list their own invoice documents.
+      allow list: if isOwner(userId);
+
+      // Allow the user to update their own invoice documents, but only if the document exists.
+      allow update: if isExistingOwner(userId);
+
+      // Allow the user to delete their own invoice documents, but only if the document exists.
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Controls access to settings documents for a specific user.
+     * @description Controls access to settings data for individual users.
      * @path /users/{userId}/settings/{settingId}
-     * @allow (create) - User 'user_abc' can create a new setting document with ID matching 'setting_123' when authenticated as 'user_abc'.
-     * @allow (update) - User 'user_abc' can update an existing setting document when authenticated as 'user_abc'.
-     * @allow (delete) - User 'user_abc' can delete an existing setting document when authenticated as 'user_abc'.
-     * @allow (get) - User 'user_abc' can get their own settings documents when authenticated as 'user_abc'.
-     * @allow (list) - User 'user_abc' can list their own settings documents when authenticated as 'user_abc'.
-     * @deny (create) - User 'user_xyz' cannot create a new setting document under /users/user_abc/ if authenticated as 'user_xyz'.
-     * @deny (update) - User 'user_xyz' cannot update a setting document under /users/user_abc/ if authenticated as 'user_xyz'.
-     * @deny (delete) - User 'user_xyz' cannot delete a setting document under /users/user_abc/ if authenticated as 'user_xyz'.
+     * @allow (create) - A user can create a new settings document under their own user ID.
+     * @deny (create) - A user cannot create a settings document under another user's ID.
+     * @allow (get, list, update, delete) - A user can only access settings data associated with their own user ID.
+     * @deny (get, list, update, delete) - A user cannot access or modify settings data associated with another user's ID.
      * @principle Enforces document ownership for writes and restricts access to a user's own data tree.
      */
     match /users/{userId}/settings/{settingId} {
-      // Helper function to check if the user is signed in
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      // Helper function to check if the authenticated user is the owner of the document
+       // Helper function to check if the authenticated user is the owner of the document.
       function isOwner(userId) {
         return request.auth.uid == userId;
       }
 
-      // Helper function to check if the authenticated user is the owner of the existing document
+      // Helper function to check if the authenticated user is the owner of the EXISTING document.
       function isExistingOwner(userId) {
         return isOwner(userId) && resource != null;
       }
 
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if isSignedIn() && isOwner(userId);
-      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == settingId;
-      allow update: if isSignedIn() && isExistingOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if isSignedIn() && isExistingOwner(userId);
+      // Allow a user to create a new settings document under their own user ID.
+      allow create: if isOwner(userId);
+
+      // Allow the user to get their own settings documents.
+      allow get: if isOwner(userId);
+
+      // Allow the user to list their own settings documents.
+      allow list: if isOwner(userId);
+
+      // Allow the user to update their own settings documents, but only if the document exists.
+      allow update: if isExistingOwner(userId);
+
+      // Allow the user to delete their own settings documents, but only if the document exists.
+      allow delete: if isExistingOwner(userId);
     }
   }
 }
