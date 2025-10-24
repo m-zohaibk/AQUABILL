@@ -23,25 +23,6 @@ AquaBill is a modern, real-time invoicing application designed for small-scale w
 
 AquaBill uses email and password for authentication. When registering a new account, please ensure your **password is at least 6 characters long**.
 
-## Getting Started
-
-To run this project locally, follow these steps:
-
-1.  **Clone the repository:**
-    ```bash
-    git clone <repository-url>
-    ```
-
-2.  **Install dependencies:**
-    ```bash
-    npm install
-    ```
-
-3.  **Run the development server:**
-    ```bash
-    npm run dev
-    ```
-    The application will be available at `http://localhost:9002`.
 
 ## Tech Stack
 
