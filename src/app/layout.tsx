@@ -1,10 +1,10 @@
 import type {Metadata} from 'next';
 import './globals.css';
 import { FirebaseClientProvider } from '@/firebase';
-import { Inter } from 'next/font/google';
+import { Quicksand } from 'next/font/google';
 import { Toaster } from '@/components/ui/toaster';
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+const quicksand = Quicksand({ subsets: ['latin'], variable: '--font-quicksand' });
 
 export const metadata: Metadata = {
   title: 'AquaBill - Water Supply Invoicing',
@@ -17,7 +17,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable}`}>
+    <html lang="en" className={`${quicksand.variable}`}>
       <body className="font-sans antialiased">
         <FirebaseClientProvider>
           {children}
