@@ -1,35 +1,46 @@
 /**
- * @file Firestore Security Rules
- * @description This ruleset enforces a strict user-ownership model, where each user can only access data nested under their own user ID.
+ * @fileoverview Firestore Security Rules for Water Supply App.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model where each user has exclusive
+ * access to their own data. All data is nested under /users/{userId}, and access
+ * is granted only to the authenticated user whose UID matches the {userId} path segment.
  *
  * Data Structure:
- * All data is nested under /users/{userId}, with subcollections for customers, invoices, and settings. This structure ensures data isolation between users.
+ * - /users/{userId}/customers/{customerId}: Stores customer information for each user.
+ * - /users/{userId}/invoices/{invoiceId}: Stores invoice data for each user.
+ * - /users/{userId}/settings/{settingId}: Stores application settings for each user.
  *
  * Key Security Decisions:
- * - User listing is implicitly disallowed by the data structure and rules.
- * - The default security posture is strict: any access not explicitly allowed is denied.
- * - Authorization relies solely on the authenticated user's UID matching the {userId} path segment.
- *
- *  Denormalization for Authorization: NOT REQUIRED - The data structure ensures that authorization data is not denormalized.
+ * - All data is private to the user.
+ * - List operations are allowed for the owner.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to customer documents under a user's profile.
-     * @path /users/{userId}/customers/{customerId}
-     * @allow (create) User 'tVROdyxhaOWAh9tfCUQW7qqO7O13' can create a customer document if their UID matches the {userId} path.
-     * @deny (create) User 'anotherUserId' cannot create a customer document under '/users/tVROdyxhaOWAh9tfCUQW7qqO7O13/customers'
-     * @allow (get) User 'tVROdyxhaOWAh9tfCUQW7qqO7O13' can get a customer document if their UID matches the {userId} path.
-     * @deny (get) User 'anotherUserId' cannot get a customer document under '/users/tVROdyxhaOWAh9tfCUQW7qqO7O13/customers'
-     * @allow (list) User 'tVROdyxhaOWAh9tfCUQW7qqO7O13' can list customer documents if their UID matches the {userId} path.
-     * @deny (list) User 'anotherUserId' cannot list customer documents under '/users/tVROdyxhaOWAh9tfCUQW7qqO7O13/customers'
-     * @allow (update) User 'tVROdyxhaOWAh9tfCUQW7qqO7O13' can update a customer document if their UID matches the {userId} path.
-     * @deny (update) User 'anotherUserId' cannot update a customer document under '/users/tVROdyxhaOWAh9tfCUQW7qqO7O13/customers'
-     * @allow (delete) User 'tVROdyxhaOWAh9tfCUQW7qqO7O13' can delete a customer document if their UID matches the {userId} path.
-     * @deny (delete) User 'anotherUserId' cannot delete a customer document under '/users/tVROdyxhaOWAh9tfCUQW7qqO7O13/customers'
+     * @description All documents under a user's path are only accessible by that user.
+     * @path /users/{userId}/{document=**}
+     * @allow (read, write) An authenticated user with UID "user123" can read and write to /users/user123/customers/customer456.
+     * @deny (read, write) An authenticated user with UID "user456" cannot read or write to /users/user123/customers/customer456.
      * @principle Enforces document ownership based on the user ID in the path.
+     */
+    match /users/{userId}/{document=**} {
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && isExistingOwner(userId);
+      allow delete: if isSignedIn() && isExistingOwner(userId);
+    }
+
+    /**
+     * @description Rules for the customers collection under a specific user.
+     * @path /users/{userId}/customers/{customerId}
+     * @allow (create) An authenticated user with UID "user123" can create a customer document under /users/user123/customers. The document's ID does not need to match the userId.
+     * @allow (read) An authenticated user with UID "user123" can read a customer document under /users/user123/customers/customer456.
+     * @deny (read) An authenticated user with UID "user456" cannot read a customer document under /users/user123/customers/customer456.
+     * @principle Enforces document ownership for data privacy.
      */
     match /users/{userId}/customers/{customerId} {
       allow get: if isSignedIn() && isOwner(userId);
@@ -40,19 +51,12 @@ service cloud.firestore {
     }
 
     /**
-     * @description Controls access to invoice documents under a user's profile.
+     * @description Rules for the invoices collection under a specific user.
      * @path /users/{userId}/invoices/{invoiceId}
-     * @allow (create) User 'tVROdyxhaOWAh9tfCUQW7qqO7O13' can create an invoice document if their UID matches the {userId} path.
-     * @deny (create) User 'anotherUserId' cannot create an invoice document under '/users/tVROdyxhaOWAh9tfCUQW7qqO7O13/invoices'
-     * @allow (get) User 'tVROdyxhaOWAh9tfCUQW7qqO7O13' can get an invoice document if their UID matches the {userId} path.
-     * @deny (get) User 'anotherUserId' cannot get an invoice document under '/users/tVROdyxhaOWAh9tfCUQW7qqO7O13/invoices'
-     * @allow (list) User 'tVROdyxhaOWAh9tfCUQW7qqO7O13' can list invoice documents if their UID matches the {userId} path.
-     * @deny (list) User 'anotherUserId' cannot list invoice documents under '/users/tVROdyxhaOWAh9tfCUQW7qqO7O13/invoices'
-     * @allow (update) User 'tVROdyxhaOWAh9tfCUQW7qqO7O13' can update an invoice document if their UID matches the {userId} path.
-     * @deny (update) User 'anotherUserId' cannot update an invoice document under '/users/tVROdyxhaOWAh9tfCUQW7qqO7O13/invoices'
-     * @allow (delete) User 'tVROdyxhaOWAh9tfCUQW7qqO7O13' can delete an invoice document if their UID matches the {userId} path.
-     * @deny (delete) User 'anotherUserId' cannot delete an invoice document under '/users/tVROdyxhaOWAh9tfCUQW7qqO7O13/invoices'
-     * @principle Enforces document ownership based on the user ID in the path.
+     * @allow (create) An authenticated user with UID "user123" can create an invoice document under /users/user123/invoices. The document's ID does not need to match the userId.
+     * @allow (read) An authenticated user with UID "user123" can read an invoice document under /users/user123/invoices/invoice456.
+     * @deny (read) An authenticated user with UID "user456" cannot read an invoice document under /users/user123/invoices/invoice456.
+     * @principle Enforces document ownership for data privacy.
      */
     match /users/{userId}/invoices/{invoiceId} {
       allow get: if isSignedIn() && isOwner(userId);
@@ -63,19 +67,12 @@ service cloud.firestore {
     }
 
     /**
-     * @description Controls access to settings documents under a user's profile.
+     * @description Rules for the settings collection under a specific user.
      * @path /users/{userId}/settings/{settingId}
-     * @allow (create) User 'tVROdyxhaOWAh9tfCUQW7qqO7O13' can create a settings document if their UID matches the {userId} path.
-     * @deny (create) User 'anotherUserId' cannot create a settings document under '/users/tVROdyxhaOWAh9tfCUQW7qqO7O13/settings'
-     * @allow (get) User 'tVROdyxhaOWAh9tfCUQW7qqO7O13' can get a settings document if their UID matches the {userId} path.
-     * @deny (get) User 'anotherUserId' cannot get a settings document under '/users/tVROdyxhaOWAh9tfCUQW7qqO7O13/settings'
-     * @allow (list) User 'tVROdyxhaOWAh9tfCUQW7qqO7O13' can list settings documents if their UID matches the {userId} path.
-     * @deny (list) User 'anotherUserId' cannot list settings documents under '/users/tVROdyxhaOWAh9tfCUQW7qqO7O13/settings'
-     * @allow (update) User 'tVROdyxhaOWAh9tfCUQW7qqO7O13' can update a settings document if their UID matches the {userId} path.
-     * @deny (update) User 'anotherUserId' cannot update a settings document under '/users/tVROdyxhaOWAh9tfCUQW7qqO7O13/settings'
-     * @allow (delete) User 'tVROdyxhaOWAh9tfCUQW7qqO7O13' can delete a settings document if their UID matches the {userId} path.
-     * @deny (delete) User 'anotherUserId' cannot delete a settings document under '/users/tVROdyxhaOWAh9tfCUQW7qqO7O13/settings'
-     * @principle Enforces document ownership based on the user ID in the path.
+     * @allow (create) An authenticated user with UID "user123" can create a setting document under /users/user123/settings. The document's ID does not need to match the userId.
+     * @allow (read) An authenticated user with UID "user123" can read a setting document under /users/user123/settings/setting456.
+     * @deny (read) An authenticated user with UID "user456" cannot read a setting document under /users/user123/settings/setting456.
+     * @principle Enforces document ownership for data privacy.
      */
     match /users/{userId}/settings/{settingId} {
       allow get: if isSignedIn() && isOwner(userId);
