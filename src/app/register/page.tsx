@@ -34,6 +34,11 @@ export default function RegisterPage() {
       return;
     }
 
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters long.");
+      return;
+    }
+
     if (!auth) {
       setError('Authentication service is not available.');
       return;
@@ -75,6 +80,9 @@ export default function RegisterPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
+               <p className="text-xs text-muted-foreground">
+                Password must be at least 6 characters long.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirm-password">Confirm Password</Label>
